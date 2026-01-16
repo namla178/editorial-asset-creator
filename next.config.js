@@ -10,6 +10,9 @@ const nextConfig = {
       },
     ],
   },
+  experimental: {
+    serverComponentsExternalPackages: ['google-auth-library', 'sharp'],
+  },
 };
 
 module.exports = nextConfig;
