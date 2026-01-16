@@ -1,32 +1,25 @@
 import OpenAI from 'openai';
 import { ProductData, DesignBrief } from '@/types';
+import { logRequest, logResponse, logError } from '@/utils/logger';
 
 /**
  * Service for generating design briefs using OpenAI LLM
  */
 export class LLMService {
-  private openai: OpenAI | null = null;
+  private openai: OpenAI;
   private readonly maxRetries = 2;
   private readonly retryDelay = 5000; // 5 seconds
 
   constructor() {
-    const apiKey = process.env.OPENAI_API_KEY;
-    // Only initialize OpenAI if we have a valid API key
-    if (apiKey && apiKey !== 'your_openai_api_key_here') {
-      this.openai = new OpenAI({ apiKey });
-    }
+    this.openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
   }
 
   /**
    * Generates a design brief from product data
    */
   async generateDesignBrief(productData: ProductData): Promise<DesignBrief> {
-    // If no OpenAI client, use fallback immediately
-    if (!this.openai) {
-      console.warn('OpenAI API key not configured, using template-based brief generation');
-      return this.generateFallbackBrief(productData);
-    }
-
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
@@ -37,7 +30,7 @@ export class LLMService {
         
         // Check if error is retryable
         if (!this.isRetryableError(error)) {
-          break;
+          throw error;
         }
 
         if (attempt < this.maxRetries) {
@@ -55,30 +48,53 @@ export class LLMService {
    * Attempts to generate a design brief via API
    */
   private async attemptGenerateBrief(productData: ProductData): Promise<DesignBrief> {
-    if (!this.openai) {
-      throw new Error('OpenAI client not initialized');
-    }
     const prompt = this.constructPrompt(productData);
+
+    logRequest('OpenAI LLM', 'generateDesignBrief', {
+      model: 'gpt-4-turbo',
+      temperature: 0.8,
+      max_tokens: 2500,
+      promptLength: prompt.length,
+      productName: productData.name,
+    });
 
     try {
       const response = await this.openai.chat.completions.create({
-        model: 'gpt-4',
+        model: 'gpt-4-turbo',
         messages: [
           {
             role: 'system',
-            content: `You are an expert creative director specializing in commercial advertising and editorial content. 
-Your task is to create compelling design briefs for product advertisements.
+            content: `You are an expert creative director specializing in EDITORIAL commercial advertising featuring real people using products.
+
+Your task is to transform product information into compelling EDITORIAL advertising concepts that show PEOPLE using or interacting with the product in lifestyle scenarios.
+
+KEY REQUIREMENTS:
+- ALWAYS include people/humans using, wearing, or interacting with the product
+- Create lifestyle/editorial scenarios (NOT just product photography)
+- Examples: person trail running with shoes, person using tech gadget, person wearing fashion item, person cooking with appliance
+- Focus on human experience, emotion, and storytelling
+- Show the product in real-world use contexts
+- Transform product features into human benefits and experiences
+
 Always respond with valid JSON matching the specified format.
-Focus on creating visually striking, brand-safe, and commercially effective advertising concepts.`,
+Focus on creating visually striking, emotionally engaging, and commercially effective editorial advertising concepts with people.`,
           },
           {
             role: 'user',
             content: prompt,
           },
         ],
-        temperature: 0.7,
-        max_tokens: 2000,
+        temperature: 0.8,
+        max_tokens: 2500,
         response_format: { type: 'json_object' },
+      });
+
+      logResponse('OpenAI LLM', 'generateDesignBrief', {
+        id: response.id,
+        model: response.model,
+        usage: response.usage,
+        finishReason: response.choices[0]?.finish_reason,
+        contentLength: response.choices[0]?.message?.content?.length || 0,
       });
 
       const content = response.choices[0]?.message?.content;
@@ -88,6 +104,8 @@ Focus on creating visually striking, brand-safe, and commercially effective adve
 
       return this.parseResponse(content, productData.name);
     } catch (error) {
+      logError('OpenAI LLM', 'generateDesignBrief', error, { productName: productData.name });
+      
       const openAIError = error as { status?: number; code?: string };
       
       if (openAIError.status === 401) {
@@ -114,31 +132,76 @@ Focus on creating visually striking, brand-safe, and commercially effective adve
       productData.price ? `Price: ${productData.price}` : '',
     ].filter(Boolean).join('\n');
 
-    return `Create an editorial design brief for the following product advertisement:
+    return `Create an EDITORIAL design brief for the following product advertisement:
 
 ${productInfo}
 
-Generate a creative design brief that includes:
-1. Visual style direction (photography style, lighting, composition)
-2. Messaging and copy suggestions (headline, tagline, body copy ideas)
-3. Target audience description
-4. Color palette recommendations (3-5 hex colors that complement the product)
-5. Overall mood and atmosphere
-6. Key product features to highlight
-7. Call to action
-8. A detailed image prompt for AI image generation (describe the ideal ad image in detail)
+CRITICAL: This must be an EDITORIAL LIFESTYLE concept featuring a PERSON/HUMAN using or interacting with the product, NOT just product photography.
+
+Generate a creative EDITORIAL design brief that shows people using the product in real-world scenarios:
+
+1. EDITORIAL CONCEPT & STORYTELLING (MUST include person using product):
+   - Describe a compelling scenario of a person using this product
+   - Examples: "Person trail running through mountain terrain with [product]", "Person using [product] while working from cafe", "Person wearing [product] at outdoor festival"
+   - Focus on human experience, emotion, and lifestyle context
+   - Transform product features into human benefits and real-world use cases
+
+2. VISUAL STYLE & SCENE COMPOSITION (with person):
+   - Photography style showing person interacting with product
+   - Lighting that highlights both person and product
+   - Composition featuring person as subject with product in use
+   - Editorial magazine-quality aesthetic
+
+3. MESSAGING (human-focused, not just product specs):
+   - Headline about the human experience or benefit
+   - Tagline focused on lifestyle and emotion
+   - Copy emphasizing how people use and benefit from this product
+
+4. TARGET AUDIENCE (real people):
+   - Describe the specific person who would use this product
+   - Their lifestyle, values, aspirations, activities
+
+5. COLOR PALETTE:
+   - 3-5 hex colors that complement both the product AND the editorial lifestyle scene
+
+6. MOOD & ATMOSPHERE (human-centric):
+   - Emotional tone of person using the product
+   - Atmosphere of the lifestyle scenario
+
+7. KEY PRODUCT FEATURES (in context of use):
+   - Features shown through person actively using them
+   - Benefits demonstrated by person's experience
+
+8. CALL TO ACTION (lifestyle-focused):
+   - CTA that speaks to the lifestyle or experience
+
+9. IMAGE PROMPT (MUST feature person using product):
+   - Detailed prompt for AI image generation
+   - MUST explicitly describe: a person/human using, wearing, or interacting with this exact product
+   - Include: person's activity, setting, lighting, mood, AND the product being used
+   - Example format: "Editorial lifestyle photograph of [specific person description] [action with product] in [setting], [product visible and in use], [lighting], [mood], high-quality commercial photography"
+   - The product MUST be visible and recognizable while being used by the person
+
+10. VIDEO PROMPT (MUST feature person using product in motion):
+   - Detailed prompt for AI video generation  
+   - MUST show: person actively using product with motion and action
+   - Include: person's movement, product interaction, setting, atmosphere
+   - Example: "Editorial commercial video of [person] [action sequence with product], product in use throughout, [camera movement], [mood], professional cinematography"
 
 Respond with a JSON object in this exact format:
 {
-  "visualStyle": "string describing the visual direction",
-  "messaging": "string with headline and key messaging",
-  "targetAudience": "string describing the target demographic",
+  "visualStyle": "string describing editorial visual direction WITH PERSON using product",
+  "messaging": "string with headline and key messaging focused on human experience",
+  "targetAudience": "string describing the specific person/demographic who uses this product",
   "colorPalette": ["#hex1", "#hex2", "#hex3"],
-  "mood": "string describing the emotional tone",
-  "keyFeatures": ["feature1", "feature2", "feature3"],
-  "callToAction": "string with the CTA",
-  "imagePrompt": "detailed prompt for AI image generation"
-}`;
+  "mood": "string describing emotional tone of person using product",
+  "keyFeatures": ["feature1 in use", "feature2 benefit", "feature3 experience"],
+  "callToAction": "string with lifestyle-focused CTA",
+  "imagePrompt": "DETAILED prompt explicitly showing person/human using this product in editorial lifestyle scenario",
+  "videoPrompt": "DETAILED prompt explicitly showing person/human using this product in motion with editorial storytelling"
+}
+
+REMEMBER: The image and video prompts MUST feature a person/human using or interacting with the product. This is non-negotiable.`;
   }
 
   /**

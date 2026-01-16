@@ -3,15 +3,16 @@ import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { GenerationJob, GeneratedAsset } from '@/types';
 
-// Extend global to include our job store (persists across hot reloads in dev)
+// Declare global type for Node.js global object
 declare global {
   var jobStore: Map<string, GenerationJob> | undefined;
 }
 
-// In-memory job storage (replace with database in production)
-// Using global to persist across Next.js hot reloads in development
-const jobStore = global.jobStore ?? new Map<string, GenerationJob>();
-global.jobStore = jobStore;
+// Use global job store to persist across hot reloads in development
+const jobStore = global.jobStore || new Map<string, GenerationJob>();
+if (!global.jobStore) {
+  global.jobStore = jobStore;
+}
 
 /**
  * Service for managing generated assets and job storage

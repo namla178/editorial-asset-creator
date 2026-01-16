@@ -3,6 +3,7 @@ import { GenerateRequest, GenerateResponse, ErrorResponse } from '@/types/api';
 import { webScraperService } from '@/services/WebScraperService';
 import { llmService } from '@/services/LLMService';
 import { imageGenerationService } from '@/services/ImageGenerationService';
+import { videoGenerationService } from '@/services/VideoGenerationService';
 import { storageService } from '@/services/StorageService';
 
 /**
@@ -69,6 +70,7 @@ async function processJob(
   options?: { includeVideo: boolean; imageCount: number }
 ) {
   const imageCount = options?.imageCount || 1;
+  const includeVideo = options?.includeVideo ?? true; // Default to including video
 
   try {
     // Step 1: Scrape product page
@@ -102,7 +104,7 @@ async function processJob(
     // Step 3: Generate images
     storageService.updateJob(jobId, {
       status: 'generating_assets',
-      progress: 70,
+      progress: 50,
       currentStep: 'Generating editorial images...',
     });
 
@@ -112,7 +114,7 @@ async function processJob(
       imageCount
     );
 
-    // Create asset records
+    // Create image asset records
     for (let i = 0; i < images.length; i++) {
       const image = images[i];
       const asset = storageService.createAsset(
@@ -123,6 +125,35 @@ async function processJob(
         designBrief.messaging
       );
       storageService.addAssetToJob(jobId, asset);
+    }
+
+    // Step 4: Generate video (if requested)
+    if (includeVideo) {
+      storageService.updateJob(jobId, {
+        status: 'generating_assets',
+        progress: 75,
+        currentStep: 'Generating editorial video...',
+      });
+
+      const video = await videoGenerationService.generateVideo(
+        designBrief,
+        productData
+      );
+
+      const videoAsset = storageService.createAsset(
+        jobId,
+        'video',
+        video.filePath,
+        `${designBrief.productName} - Editorial Video`,
+        designBrief.messaging
+      );
+      
+      // Add thumbnail if available
+      if (video.thumbnail) {
+        videoAsset.thumbnail = video.thumbnail;
+      }
+      
+      storageService.addAssetToJob(jobId, videoAsset);
     }
 
     // Complete job

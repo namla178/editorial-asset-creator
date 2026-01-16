@@ -1,11 +1,44 @@
 /**
+ * Image view/angle type for comprehensive product understanding
+ */
+export type ImageViewType = 
+  | 'main'           // Primary product image
+  | 'front'          // Front view
+  | 'back'           // Back view
+  | 'side'           // Side view (left or right)
+  | 'detail'         // Close-up detail shot
+  | 'alternate'      // Alternate angle
+  | 'zoom'           // High-resolution zoom image
+  | 'lifestyle'      // Product in use/lifestyle context
+  | 'unknown';       // Cannot determine view type
+
+/**
+ * Comprehensive metadata for each downloaded product image
+ */
+export interface ImageMetadata {
+  localPath: string;           // Local file path
+  originalUrl: string;         // Original source URL
+  width: number;               // Image width in pixels
+  height: number;              // Image height in pixels
+  fileSize: number;            // File size in bytes
+  format: string;              // Image format (png, jpg, webp, etc.)
+  viewType: ImageViewType;     // Type of view/angle
+  qualityScore: number;        // Quality score (0-100) based on resolution and size
+  isMainProductImage: boolean; // Whether this is the primary product image
+  sourceLocation?: string;     // Where on the page this image was found
+  downloadedAt: Date;          // When the image was downloaded
+}
+
+/**
  * Product data extracted from a product page
  */
 export interface ProductData {
   url: string;
   name: string;
   description: string;
-  images: string[];
+  images: string[];                    // Original image URLs from the page
+  localImagePaths: string[];           // Downloaded local file paths for AI generation
+  imageMetadata: ImageMetadata[];      // Comprehensive metadata for each downloaded image
   price?: string;
   category?: string;
   brand?: string;

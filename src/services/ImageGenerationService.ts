@@ -1,12 +1,19 @@
 import { VertexAI } from '@google-cloud/vertexai';
-import { DesignBrief, ProductData } from '@/types';
+import { DesignBrief, ProductData, ImageMetadata } from '@/types';
 import * as fs from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import sharp from 'sharp';
+import { webScraperService } from './WebScraperService';
+import { logRequest, logResponse, logError } from '@/utils/logger';
 
 /**
- * Service for generating images using Vertex AI
+ * Service for generating images using Vertex AI Imagen (Nano Banana model)
+ * 
+ * Uses Imagen 3 for high-quality editorial-style image generation with product
+ * images as reference input for consistent product representation.
+ * 
+ * Now implements smart image selection using quality scores and metadata.
  */
 export class ImageGenerationService {
   private vertexAI: VertexAI | null = null;
@@ -40,7 +47,37 @@ export class ImageGenerationService {
   }
 
   /**
-   * Generates an editorial image based on the design brief
+   * Selects the best quality product image for reference using metadata
+   */
+  private selectBestProductImage(productData: ProductData): { path: string; metadata?: ImageMetadata } | undefined {
+    // Use metadata-based selection if available
+    if (productData.imageMetadata && productData.imageMetadata.length > 0) {
+      const bestImage = webScraperService.getBestMainImage(productData.imageMetadata);
+      if (bestImage && fs.existsSync(bestImage.localPath)) {
+        console.log(`Selected best product image: ${bestImage.localPath}`);
+        console.log(`  View type: ${bestImage.viewType}, Quality score: ${bestImage.qualityScore}`);
+        console.log(`  Dimensions: ${bestImage.width}x${bestImage.height}, Is main: ${bestImage.isMainProductImage}`);
+        return { path: bestImage.localPath, metadata: bestImage };
+      }
+    }
+    
+    // Fall back to first available local image
+    if (productData.localImagePaths && productData.localImagePaths.length > 0) {
+      const firstImage = productData.localImagePaths[0];
+      if (fs.existsSync(firstImage)) {
+        console.log(`Falling back to first product image: ${firstImage}`);
+        return { path: firstImage };
+      }
+    }
+    
+    console.log('No product images available for reference');
+    return undefined;
+  }
+
+  /**
+   * Generates an editorial image based on the design brief and product images
+   * 
+   * Uses the best quality product image as reference for accurate product representation.
    */
   async generateImage(
     brief: DesignBrief,
@@ -49,8 +86,12 @@ export class ImageGenerationService {
     const prompt = this.constructImagePrompt(brief, productData);
     
     try {
-      // Generate image using Vertex AI Imagen
-      const imageData = await this.callImageGenerationAPI(prompt);
+      // Select the best quality product image for reference
+      const selectedImage = this.selectBestProductImage(productData);
+      const productImagePath = selectedImage?.path;
+      
+      // Generate image using Vertex AI with product image as reference
+      const imageData = await this.callImageGenerationAPI(prompt, productImagePath);
       
       // Save image to disk
       const filename = `${uuidv4()}.png`;
@@ -86,34 +127,44 @@ export class ImageGenerationService {
   }
 
   /**
-   * Constructs an optimized prompt for image generation
+   * Constructs an optimized prompt for editorial image generation with person using product
    */
   private constructImagePrompt(brief: DesignBrief, productData: ProductData): string {
     const basePrompt = brief.imagePrompt;
     
-    // Enhance the prompt with additional details
+    // Enhance the prompt with editorial requirements emphasizing person using product
     const enhancedPrompt = `${basePrompt}
+
+EDITORIAL REQUIREMENTS (CRITICAL):
+- MUST feature a person/human using, wearing, or interacting with the product
+- Show the product in active use by the person (e.g., person trail running with shoes, person using tech device, person wearing clothing)
+- Product must be visible and recognizable while being used by the person
+- Editorial lifestyle scenario, NOT just product photography
 
 Style: ${brief.visualStyle}
 Mood: ${brief.mood}
 Product: ${productData.name}
 ${productData.brand ? `Brand: ${productData.brand}` : ''}
 
-Requirements:
+Technical Requirements:
 - High resolution, 1024x1024 minimum
 - Commercial advertising quality
-- Editorial magazine style
+- Editorial magazine photography style
+- Person as the subject with product in use
+- Lifestyle scenario with authentic human interaction
 - Clean, professional composition
 - Suitable for commercial use
-- No text in the image (text will be added separately)`;
+- No text in the image (text will be added separately)
+
+CRITICAL: The image MUST show a person using or interacting with this product in a real-world lifestyle context.`;
 
     return enhancedPrompt;
   }
 
   /**
-   * Calls the Vertex AI Imagen API to generate an image
+   * Calls the Vertex AI API to generate an image (with optional product image reference)
    */
-  private async callImageGenerationAPI(prompt: string): Promise<string> {
+  private async callImageGenerationAPI(prompt: string, productImagePath?: string): Promise<string> {
     // If not configured or in development, use placeholder
     if (!this.isConfigured || !this.vertexAI) {
       console.warn('Vertex AI not configured, using placeholder image');
@@ -125,6 +176,10 @@ Requirements:
     console.log('  Project:', process.env.GOOGLE_CLOUD_PROJECT);
     console.log('  Region:', process.env.GOOGLE_CLOUD_REGION || 'us-central1');
     console.log('  Credentials file:', process.env.GOOGLE_APPLICATION_CREDENTIALS);
+    console.log('  Model: imagen-3.0-generate-001');
+    if (productImagePath) {
+      console.log('  Product image:', productImagePath);
+    }
     
     // Check if credentials file exists
     const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
@@ -140,43 +195,98 @@ Requirements:
     }
 
     try {
-      // Use Gemini model for image generation (Imagen requires different API)
-      // Gemini 1.5 Flash with vision capabilities
-      const generativeModel = this.vertexAI.getGenerativeModel({
-        model: 'gemini-1.5-flash',
-      });
-
-      // Create a prompt that asks Gemini to describe an image (we'll use placeholder for actual image)
-      // Note: Gemini cannot generate images, only analyze them
-      // For actual image generation, we'd need the Imagen REST API
-      console.log('Note: Using Gemini for text generation. Imagen image generation requires REST API.');
-      console.log('Generating placeholder image with AI-crafted description...');
+      // Use Imagen 3 for image generation via REST API
+      const project = process.env.GOOGLE_CLOUD_PROJECT;
+      const location = process.env.GOOGLE_CLOUD_REGION || 'us-central1';
+      const model = 'imagen-3.0-generate-001';
       
-      const request = {
-        contents: [{ role: 'user', parts: [{ text: `You are an image description assistant. Based on this prompt, describe what the ideal image would look like in detail: ${prompt}` }] }],
+      const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${model}:predict`;
+      
+      // Get access token from service account
+      const { GoogleAuth } = require('google-auth-library');
+      const auth = new GoogleAuth({
+        keyFilename: credPath,
+        scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+      });
+      const client = await auth.getClient();
+      const accessToken = await client.getAccessToken();
+      
+      // Build request body - include product image if available
+      const fs = require('fs');
+      const instance: { prompt: string; image?: { bytesBase64Encoded: string } } = {
+        prompt: prompt,
       };
 
-      const response = await generativeModel.generateContent(request);
-      const result = response.response;
+      // Add product image as reference if available
+      if (productImagePath && fs.existsSync(productImagePath)) {
+        const imageBuffer = fs.readFileSync(productImagePath);
+        instance.image = {
+          bytesBase64Encoded: imageBuffer.toString('base64'),
+        };
+        console.log('  Including product image as reference');
+      }
+
+      const requestBody = {
+        instances: [instance],
+        parameters: {
+          sampleCount: 1,
+          aspectRatio: '1:1',
+          safetyFilterLevel: 'block_some',
+          personGeneration: 'allow_adult',
+        },
+      };
+
+      // Log the request (with base64 truncation)
+      logRequest('Vertex AI Imagen 3', 'generateImage', {
+        endpoint,
+        model,
+        promptLength: prompt.length,
+        promptPreview: prompt.substring(0, 300),
+        hasProductImage: !!instance.image,
+        productImageSize: instance.image ? `${Math.round(instance.image.bytesBase64Encoded.length / 1024)}KB` : null,
+        parameters: requestBody.parameters,
+      });
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        logError('Vertex AI Imagen 3', 'generateImage', new Error(`${response.status} - ${errorText}`), {
+          status: response.status,
+          statusText: response.statusText,
+        });
+        throw new Error(`Imagen API error: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
       
-      console.log('Gemini API response received successfully');
+      logResponse('Vertex AI Imagen 3', 'generateImage', {
+        status: response.status,
+        statusText: response.statusText,
+        hasPredictions: !!result.predictions,
+        predictionsCount: result.predictions?.length || 0,
+        imageDataSize: result.predictions?.[0]?.bytesBase64Encoded 
+          ? `${Math.round(result.predictions[0].bytesBase64Encoded.length / 1024)}KB`
+          : null,
+      });
       
-      // Since Gemini can't generate images, return placeholder
-      // In production, you'd use the Imagen REST API or DALL-E
-      return this.getPlaceholderImage();
+      // Extract base64 image from response
+      if (result.predictions && result.predictions[0] && result.predictions[0].bytesBase64Encoded) {
+        return result.predictions[0].bytesBase64Encoded;
+      }
+      
+      throw new Error('No image data in Imagen response');
     } catch (error) {
       const err = error as Error;
       console.error('Vertex AI API error:', err.message);
       console.error('Full error:', error);
-      
-      // Check for common errors
-      if (err.message.includes('PERMISSION_DENIED')) {
-        console.error('Permission denied - check service account has "Vertex AI User" role');
-      } else if (err.message.includes('NOT_FOUND')) {
-        console.error('API not found - make sure Vertex AI API is enabled in Google Cloud Console');
-      } else if (err.message.includes('UNAUTHENTICATED')) {
-        console.error('Authentication failed - check GOOGLE_APPLICATION_CREDENTIALS path');
-      }
       
       // For development/testing, return a placeholder
       console.warn('Using placeholder image for development');

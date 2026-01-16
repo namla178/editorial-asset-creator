@@ -18,8 +18,10 @@ describe('LLMService', () => {
   const mockProductData: ProductData = {
     url: 'https://example.com/product',
     name: 'Test Product',
-    description: 'A great product for testing',
-    images: ['https://example.com/image.jpg'],
+    description: 'A test product description',
+    images: ['https://example.com/image1.jpg'],
+    localImagePaths: ['/test/image1.jpg'],
+    imageMetadata: [],
     price: '$99.99',
     category: 'Electronics',
     brand: 'TestBrand',

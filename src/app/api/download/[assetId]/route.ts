@@ -38,12 +38,13 @@ export async function GET(
       return NextResponse.json(errorResponse, { status: 404 });
     }
 
-    // Return the file as a download
-    return new NextResponse(file.buffer, {
+    // Return the file as a download (convert Buffer to Uint8Array for NextResponse)
+    const fileData = file.buffer instanceof Uint8Array ? file.buffer : new Uint8Array(file.buffer);
+    return new NextResponse(fileData, {
       headers: {
         'Content-Type': file.mimeType,
         'Content-Disposition': `attachment; filename="${file.filename}"`,
-        'Content-Length': file.buffer.length.toString(),
+        'Content-Length': fileData.length.toString(),
       },
     });
   } catch (error) {
