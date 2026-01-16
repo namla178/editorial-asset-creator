@@ -155,6 +155,26 @@ export class ImageGenerationService {
    * Constructs an optimized prompt for editorial image generation with person using product
    */
   private constructImagePrompt(brief: DesignBrief, productData: ProductData): string {
+    // If we have the full editorial brief JSON, format it with main_prompt
+    if (brief.editorialBrief) {
+      console.log('✅ Using FULL EDITORIAL BRIEF JSON for image generation');
+      
+      // Main prompt from image-prompt.json
+      const mainPrompt = "You are an expert editorial art director, fashion brand strategist, and visual storyteller. Help me create editorial image following json structure below";
+      
+      // Convert the editorial brief to a clean JSON string
+      const jsonString = JSON.stringify(brief.editorialBrief, null, 2);
+      
+      // Combine: main_prompt + newline + raw JSON
+      const fullPrompt = `${mainPrompt}
+
+${jsonString}`;
+
+      return fullPrompt;
+    }
+    
+    // Fallback to simple prompt if no editorial brief
+    console.warn('⚠️  No editorial brief JSON found, using fallback simple prompt');
     const basePrompt = brief.imagePrompt;
     
     // Enhance the prompt with editorial requirements emphasizing person using product
@@ -268,7 +288,9 @@ CRITICAL: The image MUST show a person using or interacting with this product in
           temperature: 1.0,
         },
       };
-
+      console.log("============Prompt============");
+      console.log(prompt);
+      console.log("============End Prompt============");
       // Log the request
       logRequest('Gemini 2.5 Flash Image', 'generateImage', {
         endpoint,
@@ -353,18 +375,6 @@ CRITICAL: The image MUST show a person using or interacting with this product in
             </linearGradient>
           </defs>
           <rect x="0" y="${height * 0.75}" width="${width}" height="${height * 0.25}" fill="url(#textBg)"/>
-          <text x="${width / 2}" y="${height - 80}" 
-                font-family="Arial, sans-serif" 
-                font-size="48" 
-                font-weight="bold" 
-                fill="white" 
-                text-anchor="middle">${productName}</text>
-          <text x="${width / 2}" y="${height - 40}" 
-                font-family="Arial, sans-serif" 
-                font-size="24" 
-                font-weight="bold" 
-                fill="${accentColor}" 
-                text-anchor="middle">${callToAction}</text>
         </svg>
       `;
 

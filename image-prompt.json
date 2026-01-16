@@ -1,0 +1,133 @@
+{
+  "main_prompt":"You are an expert editorial art director, fashion brand strategist, and visual storyteller. Help me create editorial image following json structure below",
+  "image_url": "imageUrl",
+  "editorial_image_brief_v1_1": {
+    "campaign_meta": {
+      "project_name": "",
+      "brand_identity": "e.g., urban performance, sustainable minimalism, luxury streetwear",
+      "platform_use_case": "Lookbook | Campaign | Banner | Social Editorial",
+      "target_audience": {
+        "persona": "",
+        "emotional_driver": "e.g., freedom, rebellion, calm confidence"
+      }
+    },
+
+    "brand_gravity_profile": {
+      "brand_energy_level": "Low | Medium | High",
+      "attitude": "e.g., bold, restrained, experimental, utilitarian",
+      "risk_tolerance": "Low | Medium | High",
+      "visual_gravity": "e.g., heavy, grounded, aggressive | light, minimal, airy",
+      "references": [
+        "Optional: iconic campaigns, cultural movements, or visual eras"
+      ]
+    },
+
+    "editorial_constraints": {
+      "image_type": "Editorial",
+      "avoid_commercial_aesthetics": true,
+      "allowed_imperfection_level": "Low | Medium | High",
+      "authenticity_bias": "Prefer raw, imperfect, lived-in visuals"
+    },
+
+    "creative_concept": {
+      "core_mood": "e.g., raw, tense, poetic, defiant",
+      "narrative_theme": "One-sentence story behind the image",
+      "editorial_statement": "Clear, opinionated message this image communicates"
+    },
+
+    "visual_hierarchy": {
+      "primary_subject": "Product | Human | Environment",
+      "secondary_subjects": ["Optional supporting elements"],
+      "frame_dominance": {
+        "primary_subject_percentage": "30-50%",
+        "secondary_subject_percentage": "10-30%"
+      }
+    },
+
+    "product_focus": {
+      "key_items": [
+        {
+          "product_name": "",
+          "category": "",
+          "colorway_or_variant": ""
+        }
+      ],
+      "visibility_style": "Integrated | Partial | Obscured | Symbolic",
+      "interaction_type": "Worn | Placed | In-motion | Environmental"
+    },
+
+    "camera_and_composition": {
+      "camera_angle": "Low | Eye-level | High | Off-axis",
+      "lens_feel": "Wide, cinematic, compressed, slightly distorted",
+      "composition_style": "Asymmetrical | Center-weighted | Cropped | Dynamic",
+      "depth_of_field": "Shallow | Medium | Deep"
+    },
+
+    "setting_and_environment": {
+      "location_type": "Real-world, textured location",
+      "environmental_drama": [
+        "fog",
+        "rain",
+        "dust",
+        "wind",
+        "harsh sunlight"
+      ],
+      "time_of_day": "Golden hour | Overcast | Night | Harsh daylight"
+    },
+
+    "lifestyle_semantic_controls": {
+      "positive_signals": [
+        "raw movement",
+        "tension or contrast",
+        "individual focus",
+        "uncontrolled nature",
+        "weathered textures"
+      ],
+      "negative_signals": [
+        "forced smiles",
+        "group posing",
+        "studio cleanliness",
+        "perfect symmetry",
+        "stock photography lighting"
+      ]
+    },
+
+    "artistic_license": {
+      "reality_bending_allowed": true,
+      "surreal_elements": [
+        "Optional symbolic or exaggerated elements"
+      ],
+      "symbolism_notes": "If surreal, define the intended meaning"
+    },
+
+    "text_and_text_visual": {
+      "include_text": true,
+      "text_content": {
+        "headline": "",
+        "supporting_line": ""
+      },
+      "text_intent": "Declarative | Provocative | Poetic | Minimal",
+      "typography_style": {
+        "font_character": "Bold editorial | Condensed | Handwritten | Geometric",
+        "case_usage": "Uppercase | Sentence case | Mixed",
+        "weight": "Light | Regular | Bold | Extra Bold"
+      },
+      "text_placement": {
+        "position": "Top | Bottom | Center | Edge-aligned",
+        "interaction_with_subject": "Overlapping | Framing | Background-only",
+        "safe_area_rule": "Must not obstruct primary subject"
+      },
+      "text_visual_treatment": {
+        "color": "High contrast | Monochrome | Muted",
+        "effects": "None | Grain | Blur | Distress",
+        "integration_style": "Feels native to the image, not overlaid"
+      }
+    },
+
+    "post_production": {
+      "color_grading": "e.g., muted earth tones, cool shadows, high contrast",
+      "texture_treatment": "Film grain | Matte | Clean digital",
+      "final_mood_check": "Does the grading reinforce the core mood?"
+    }
+  }
+}

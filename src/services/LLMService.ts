@@ -64,20 +64,11 @@ export class LLMService {
         messages: [
           {
             role: 'system',
-            content: `You are an expert creative director specializing in EDITORIAL commercial advertising featuring real people using products.
+            content: `You are an expert editorial art director, fashion brand strategist, and visual storyteller. 
 
-Your task is to transform product information into compelling EDITORIAL advertising concepts that show PEOPLE using or interacting with the product in lifestyle scenarios.
+Fill in the provided JSON structure with complete, detailed editorial brief based on the product information.
 
-KEY REQUIREMENTS:
-- ALWAYS include people/humans using, wearing, or interacting with the product
-- Create lifestyle/editorial scenarios (NOT just product photography)
-- Examples: person trail running with shoes, person using tech gadget, person wearing fashion item, person cooking with appliance
-- Focus on human experience, emotion, and storytelling
-- Show the product in real-world use contexts
-- Transform product features into human benefits and experiences
-
-Always respond with valid JSON matching the specified format.
-Focus on creating visually striking, emotionally engaging, and commercially effective editorial advertising concepts with people.`,
+CRITICAL: FOCUS ON MAIN PRODUCT. Return a complete JSON object with ALL fields filled in. Do not leave any fields empty or with placeholder text.`,
           },
           {
             role: 'user',
@@ -121,7 +112,7 @@ Focus on creating visually striking, emotionally engaging, and commercially effe
   }
 
   /**
-   * Constructs the prompt for design brief generation
+   * Constructs the prompt using main_prompt + JSON structure template
    */
   private constructPrompt(productData: ProductData): string {
     const productInfo = [
@@ -132,120 +123,288 @@ Focus on creating visually striking, emotionally engaging, and commercially effe
       productData.price ? `Price: ${productData.price}` : '',
     ].filter(Boolean).join('\n');
 
-    return `Create an EDITORIAL design brief for the following product advertisement:
+    // JSON structure template from image-prompt.json
+    const jsonTemplate = {
+      "campaign_meta": {
+        "project_name": "",
+        "brand_identity": "e.g., urban performance, sustainable minimalism, luxury streetwear",
+        "platform_use_case": "Lookbook | Campaign | Banner | Social Editorial",
+        "target_audience": {
+          "persona": "",
+          "emotional_driver": "e.g., freedom, rebellion, calm confidence"
+        }
+      },
+      "brand_gravity_profile": {
+        "brand_energy_level": "Low | Medium | High",
+        "attitude": "e.g., bold, restrained, experimental, utilitarian",
+        "risk_tolerance": "Low | Medium | High",
+        "visual_gravity": "e.g., heavy, grounded, aggressive | light, minimal, airy",
+        "references": [
+          "Optional: iconic campaigns, cultural movements, or visual eras"
+        ]
+      },
+      "editorial_constraints": {
+        "image_type": "Editorial",
+        "avoid_commercial_aesthetics": true,
+        "allowed_imperfection_level": "Low | Medium | High",
+        "authenticity_bias": "Prefer raw, imperfect, lived-in visuals"
+      },
+      "creative_concept": {
+        "core_mood": "e.g., raw, tense, poetic, defiant",
+        "narrative_theme": "One-sentence story behind the image",
+        "editorial_statement": "Clear, opinionated message this image communicates"
+      },
+      "visual_hierarchy": {
+        "primary_subject": "Product | Human | Environment",
+        "secondary_subjects": ["Optional supporting elements"],
+        "frame_dominance": {
+          "primary_subject_percentage": "30-50%",
+          "secondary_subject_percentage": "10-30%"
+        }
+      },
+      "product_focus": {
+        "key_items": [
+          {
+            "product_name": productData.name,
+            "category": productData.category || "",
+            "colorway_or_variant": ""
+          }
+        ],
+        "visibility_style": "Integrated | Partial | Obscured | Symbolic",
+        "interaction_type": "Worn | Placed | In-motion | Environmental"
+      },
+      "camera_and_composition": {
+        "camera_angle": "Low | Eye-level | High | Off-axis",
+        "lens_feel": "Wide, cinematic, compressed, slightly distorted",
+        "composition_style": "Asymmetrical | Center-weighted | Cropped | Dynamic",
+        "depth_of_field": "Shallow | Medium | Deep"
+      },
+      "setting_and_environment": {
+        "location_type": "Real-world, textured location",
+        "environmental_drama": [
+          "fog",
+          "rain",
+          "dust",
+          "wind",
+          "harsh sunlight"
+        ],
+        "time_of_day": "Golden hour | Overcast | Night | Harsh daylight"
+      },
+      "lifestyle_semantic_controls": {
+        "positive_signals": [
+          "raw movement",
+          "tension or contrast",
+          "individual focus",
+          "uncontrolled nature",
+          "weathered textures"
+        ],
+        "negative_signals": [
+          "forced smiles",
+          "group posing",
+          "studio cleanliness",
+          "perfect symmetry",
+          "stock photography lighting"
+        ]
+      },
+      "artistic_license": {
+        "reality_bending_allowed": true,
+        "surreal_elements": [
+          "Optional symbolic or exaggerated elements"
+        ],
+        "symbolism_notes": "If surreal, define the intended meaning"
+      },
+      "text_and_text_visual": {
+        "include_text": true,
+        "text_content": {
+          "headline": "",
+          "supporting_line": ""
+        },
+        "text_intent": "Declarative | Provocative | Poetic | Minimal",
+        "typography_style": {
+          "font_character": "Bold editorial | Condensed | Handwritten | Geometric",
+          "case_usage": "Uppercase | Sentence case | Mixed",
+          "weight": "Light | Regular | Bold | Extra Bold"
+        },
+        "text_placement": {
+          "position": "Top | Bottom | Center | Edge-aligned",
+          "interaction_with_subject": "Overlapping | Framing | Background-only",
+          "safe_area_rule": "Must not obstruct primary subject"
+        },
+        "text_visual_treatment": {
+          "color": "High contrast | Monochrome | Muted",
+          "effects": "None | Grain | Blur | Distress",
+          "integration_style": "Feels native to the image, not overlaid"
+        }
+      },
+      "post_production": {
+        "color_grading": "e.g., muted earth tones, cool shadows, high contrast",
+        "texture_treatment": "Film grain | Matte | Clean digital",
+        "final_mood_check": "Does the grading reinforce the core mood?"
+      }
+    };
 
+
+    const prompt = `
 ${productInfo}
 
-CRITICAL: This must be an EDITORIAL LIFESTYLE concept featuring a PERSON/HUMAN using or interacting with the product, NOT just product photography.
+JSON STRUCTURE TO FILL:
+${JSON.stringify(jsonTemplate, null, 2)}`;
 
-Generate a creative EDITORIAL design brief that shows people using the product in real-world scenarios:
-
-1. EDITORIAL CONCEPT & STORYTELLING (MUST include person using product):
-   - Describe a compelling scenario of a person using this product
-   - Examples: "Person trail running through mountain terrain with [product]", "Person using [product] while working from cafe", "Person wearing [product] at outdoor festival"
-   - Focus on human experience, emotion, and lifestyle context
-   - Transform product features into human benefits and real-world use cases
-
-2. VISUAL STYLE & SCENE COMPOSITION (with person):
-   - Photography style showing person interacting with product
-   - Lighting that highlights both person and product
-   - Composition featuring person as subject with product in use
-   - Editorial magazine-quality aesthetic
-
-3. MESSAGING (human-focused, not just product specs):
-   - Headline about the human experience or benefit
-   - Tagline focused on lifestyle and emotion
-   - Copy emphasizing how people use and benefit from this product
-
-4. TARGET AUDIENCE (real people):
-   - Describe the specific person who would use this product
-   - Their lifestyle, values, aspirations, activities
-
-5. COLOR PALETTE:
-   - 3-5 hex colors that complement both the product AND the editorial lifestyle scene
-
-6. MOOD & ATMOSPHERE (human-centric):
-   - Emotional tone of person using the product
-   - Atmosphere of the lifestyle scenario
-
-7. KEY PRODUCT FEATURES (in context of use):
-   - Features shown through person actively using them
-   - Benefits demonstrated by person's experience
-
-8. CALL TO ACTION (lifestyle-focused):
-   - CTA that speaks to the lifestyle or experience
-
-9. IMAGE PROMPT (MUST feature person using product):
-   - Detailed prompt for AI image generation
-   - MUST explicitly describe: a person/human using, wearing, or interacting with this exact product
-   - Include: person's activity, setting, lighting, mood, AND the product being used
-   - Example format: "Editorial lifestyle photograph of [specific person description] [action with product] in [setting], [product visible and in use], [lighting], [mood], high-quality commercial photography"
-   - The product MUST be visible and recognizable while being used by the person
-
-10. VIDEO PROMPT (MUST feature person using product in motion):
-   - Detailed prompt for AI video generation  
-   - MUST show: person actively using product with motion and action
-   - Include: person's movement, product interaction, setting, atmosphere
-   - Example: "Editorial commercial video of [person] [action sequence with product], product in use throughout, [camera movement], [mood], professional cinematography"
-
-Respond with a JSON object in this exact format:
-{
-  "visualStyle": "string describing editorial visual direction WITH PERSON using product",
-  "messaging": "string with headline and key messaging focused on human experience",
-  "targetAudience": "string describing the specific person/demographic who uses this product",
-  "colorPalette": ["#hex1", "#hex2", "#hex3"],
-  "mood": "string describing emotional tone of person using product",
-  "keyFeatures": ["feature1 in use", "feature2 benefit", "feature3 experience"],
-  "callToAction": "string with lifestyle-focused CTA",
-  "imagePrompt": "DETAILED prompt explicitly showing person/human using this product in editorial lifestyle scenario",
-  "videoPrompt": "DETAILED prompt explicitly showing person/human using this product in motion with editorial storytelling"
-}
-
-REMEMBER: The image and video prompts MUST feature a person/human using or interacting with the product. This is non-negotiable.`;
+    return prompt;
   }
 
   /**
    * Parses the LLM response into a DesignBrief
+   * Maps the editorial image brief format to the DesignBrief interface
    */
   private parseResponse(content: string, productName: string): DesignBrief {
     try {
       const parsed = JSON.parse(content);
 
-      // Validate required fields
-      const requiredFields = ['visualStyle', 'messaging', 'targetAudience', 'mood', 'imagePrompt'];
-      for (const field of requiredFields) {
-        if (!parsed[field]) {
-          throw new Error(`Missing required field: ${field}`);
-        }
+
+      // Validate the new editorial brief structure (removed image_prompt_for_ai requirement)
+      if (!parsed.campaign_meta || !parsed.creative_concept) {
+        console.error('Missing required fields. Received:', JSON.stringify(parsed, null, 2));
+        throw new Error('Missing required editorial brief fields');
       }
 
-      // Ensure colorPalette is an array
-      if (!Array.isArray(parsed.colorPalette)) {
-        parsed.colorPalette = ['#1a1a2e', '#16213e', '#0f3460', '#e94560', '#ffffff'];
-      }
+      // Extract color palette from post_production color_grading or use defaults
+      const colorPalette = this.extractColorPalette(parsed);
 
-      // Ensure keyFeatures is an array
-      if (!Array.isArray(parsed.keyFeatures)) {
-        parsed.keyFeatures = [];
-      }
+      // Build visual style from multiple sections
+      const visualStyle = this.buildVisualStyle(parsed);
+
+      // Build messaging from text_and_text_visual
+      const messaging = parsed.text_and_text_visual?.text_content?.headline 
+        ? `${parsed.text_and_text_visual.text_content.headline}. ${parsed.text_and_text_visual.text_content.supporting_line || ''}`
+        : parsed.creative_concept.editorial_statement;
+
+      // Extract key features from product_focus
+      const keyFeatures = parsed.product_focus?.key_items?.map((item: any) => 
+        `${item.product_name} - ${item.category}`
+      ) || [];
+
+      // Build call to action
+      const callToAction = this.buildCallToAction(parsed);
+
+      // Build image prompt from the editorial brief sections
+      const imagePrompt = this.buildImagePrompt(parsed, productName);
 
       return {
         productName,
-        visualStyle: parsed.visualStyle,
-        messaging: parsed.messaging,
-        targetAudience: parsed.targetAudience,
-        colorPalette: parsed.colorPalette,
-        mood: parsed.mood,
-        keyFeatures: parsed.keyFeatures,
-        callToAction: parsed.callToAction || 'Shop Now',
-        imagePrompt: parsed.imagePrompt,
-        videoPrompt: parsed.videoPrompt,
+        visualStyle,
+        messaging,
+        targetAudience: parsed.campaign_meta.target_audience.persona || 'Style-conscious consumers',
+        colorPalette,
+        mood: parsed.creative_concept.core_mood,
+        keyFeatures,
+        callToAction,
+        imagePrompt: imagePrompt,
+        videoPrompt: this.buildVideoPrompt(parsed),
+        editorialBrief: parsed, // Store the full editorial brief JSON
         generatedAt: new Date(),
       };
     } catch (error) {
       console.error('Failed to parse LLM response:', error);
       throw new Error('Failed to parse design brief from LLM response');
     }
+  }
+
+  /**
+   * Extracts a color palette from the editorial brief
+   */
+  private extractColorPalette(parsed: any): string[] {
+    // Try to extract colors from color_grading description
+    // For now, use a default palette based on mood
+    const mood = parsed.creative_concept?.core_mood?.toLowerCase() || '';
+    
+    if (mood.includes('dark') || mood.includes('bold') || mood.includes('intense')) {
+      return ['#1a1a2e', '#16213e', '#0f3460', '#e94560', '#ffffff'];
+    } else if (mood.includes('light') || mood.includes('airy') || mood.includes('minimal')) {
+      return ['#f8f9fa', '#e9ecef', '#dee2e6', '#495057', '#212529'];
+    } else if (mood.includes('earth') || mood.includes('natural') || mood.includes('raw')) {
+      return ['#8b7355', '#a0826d', '#c9b59a', '#3d3028', '#f4e8d8'];
+    }
+    
+    // Default neutral palette
+    return ['#2c3e50', '#34495e', '#95a5a6', '#ecf0f1', '#e74c3c'];
+  }
+
+  /**
+   * Builds a comprehensive visual style description
+   */
+  private buildVisualStyle(parsed: any): string {
+    const parts = [];
+    
+    if (parsed.creative_concept?.core_mood) {
+      parts.push(`Mood: ${parsed.creative_concept.core_mood}`);
+    }
+    
+    if (parsed.camera_and_composition) {
+      const cam = parsed.camera_and_composition;
+      parts.push(`${cam.lens_feel || 'Cinematic'} lens, ${cam.camera_angle || 'eye-level'} angle`);
+      parts.push(`${cam.composition_style || 'Dynamic'} composition with ${cam.depth_of_field || 'medium'} depth of field`);
+    }
+    
+    if (parsed.setting_and_environment) {
+      const env = parsed.setting_and_environment;
+      parts.push(`${env.location_type || 'Real-world location'} at ${env.time_of_day || 'golden hour'}`);
+    }
+    
+    if (parsed.post_production?.color_grading) {
+      parts.push(`Color: ${parsed.post_production.color_grading}`);
+    }
+    
+    if (parsed.post_production?.texture_treatment) {
+      parts.push(`Texture: ${parsed.post_production.texture_treatment}`);
+    }
+    
+    return parts.join('. ');
+  }
+
+  /**
+   * Builds a call to action from the editorial brief
+   */
+  private buildCallToAction(parsed: any): string {
+    // Use text intent to guide CTA style
+    const intent = parsed.text_and_text_visual?.text_intent?.toLowerCase() || '';
+    
+    if (intent.includes('provocative')) {
+      return 'Experience It Now';
+    } else if (intent.includes('poetic')) {
+      return 'Discover More';
+    } else if (intent.includes('minimal')) {
+      return 'Explore';
+    }
+    
+    return 'Shop Now';
+  }
+
+  /**
+   * Builds an image prompt from the editorial brief sections
+   */
+  private buildImagePrompt(parsed: any, productName: string): string {
+    const concept = parsed.creative_concept;
+    const visual = parsed.visual_hierarchy;
+    const product = parsed.product_focus?.key_items?.[0];
+    const camera = parsed.camera_and_composition;
+    const setting = parsed.setting_and_environment;
+    const target = parsed.campaign_meta?.target_audience;
+    
+    // Build a comprehensive image prompt from all sections
+    return `Editorial lifestyle photograph of ${target?.persona || 'a person'} ${parsed.product_focus?.interaction_type?.toLowerCase() || 'using'} ${product?.product_name || productName} in ${setting?.location_type || 'real-world setting'}. ${concept?.narrative_theme || 'Authentic lifestyle scenario'}. Product ${parsed.product_focus?.visibility_style?.toLowerCase() || 'visible'} and in use. ${camera?.camera_angle || 'Eye-level'} camera angle, ${camera?.lens_feel || 'cinematic'} lens. ${setting?.time_of_day || 'Natural'} lighting. ${concept?.core_mood || 'Authentic'} mood. ${camera?.composition_style || 'Dynamic'} composition with ${camera?.depth_of_field?.toLowerCase() || 'medium'} depth of field. High-quality editorial commercial photography, magazine quality, photorealistic.`;
+  }
+
+  /**
+   * Builds a video prompt from the editorial brief
+   */
+  private buildVideoPrompt(parsed: any): string {
+    const concept = parsed.creative_concept;
+    const camera = parsed.camera_and_composition;
+    const setting = parsed.setting_and_environment;
+    const product = parsed.product_focus?.key_items?.[0];
+    
+    return `Editorial commercial video: ${concept.narrative_theme}. ${camera.lens_feel || 'Cinematic'} cinematography, ${camera.camera_angle || 'dynamic'} camera movements. Person actively using ${product?.product_name || 'product'} in ${setting.location_type || 'real-world setting'}. ${setting.time_of_day || 'Golden hour'} lighting. ${concept.core_mood} atmosphere. Product visible and in use throughout. Professional commercial quality, editorial storytelling style.`;
   }
 
   /**
