@@ -1,0 +1,14 @@
+node_modules/
+.next/
+out/
+.env
+.env.local
+.env.*.local
+public/generated/*
+!public/generated/.gitkeep
+*.log
+npm-debug.log*
+.DS_Store
+*.pem
+.vercel
+*.tsbuildinfo
