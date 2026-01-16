@@ -135,9 +135,13 @@ async function processJob(
         currentStep: 'Generating editorial video...',
       });
 
+      // Use the first generated image as the source for video generation
+      const sourceImagePath = images.length > 0 ? images[0].filePath : undefined;
+
       const video = await videoGenerationService.generateVideo(
         designBrief,
-        productData
+        productData,
+        sourceImagePath
       );
 
       const videoAsset = storageService.createAsset(

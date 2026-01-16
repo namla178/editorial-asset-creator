@@ -21,13 +21,14 @@ export default function HomePage() {
   const [designBrief, setDesignBrief] = useState<GenerationJob['designBrief']>();
   const [assets, setAssets] = useState<GeneratedAsset[]>([]);
   const [productUrl, setProductUrl] = useState('');
+  const [lastOptions, setLastOptions] = useState<{ includeVideo: boolean }>({ includeVideo: true });
   
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   /**
    * Handles form submission
    */
-  const handleSubmit = useCallback(async (url: string) => {
+  const handleSubmit = useCallback(async (url: string, options: { includeVideo: boolean }) => {
     setIsLoading(true);
     setError('');
     setJobId('');
@@ -37,6 +38,7 @@ export default function HomePage() {
     setDesignBrief(undefined);
     setAssets([]);
     setProductUrl(url);
+    setLastOptions(options);
 
     try {
       const response = await fetch('/api/generate', {
@@ -44,7 +46,13 @@ export default function HomePage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ productUrl: url }),
+        body: JSON.stringify({ 
+          productUrl: url,
+          options: {
+            includeVideo: options.includeVideo,
+            imageCount: 1
+          }
+        }),
       });
 
       const data: GenerateResponse = await response.json();
@@ -176,9 +184,9 @@ export default function HomePage() {
    */
   const handleRegenerate = useCallback(() => {
     if (productUrl) {
-      handleSubmit(productUrl);
+      handleSubmit(productUrl, lastOptions);
     }
-  }, [productUrl, handleSubmit]);
+  }, [productUrl, lastOptions, handleSubmit]);
 
   const showProgress = isLoading && status !== 'pending';
   const showDesignBrief = designBrief !== undefined;

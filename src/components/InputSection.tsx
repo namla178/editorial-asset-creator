@@ -2,8 +2,12 @@
 
 import React, { useState, FormEvent } from 'react';
 
+interface GenerationOptions {
+  includeVideo: boolean;
+}
+
 interface InputSectionProps {
-  onSubmit: (url: string) => Promise<void>;
+  onSubmit: (url: string, options: GenerationOptions) => Promise<void>;
   isLoading: boolean;
   error?: string;
 }
@@ -14,6 +18,7 @@ interface InputSectionProps {
 export function InputSection({ onSubmit, isLoading, error }: InputSectionProps) {
   const [url, setUrl] = useState('');
   const [validationError, setValidationError] = useState('');
+  const [includeVideo, setIncludeVideo] = useState(true);
 
   const validateUrl = (value: string): boolean => {
     if (!value) {
@@ -42,7 +47,7 @@ export function InputSection({ onSubmit, isLoading, error }: InputSectionProps) 
       return;
     }
 
-    await onSubmit(url);
+    await onSubmit(url, { includeVideo });
   };
 
   const handleUrlChange = (value: string) => {
@@ -101,6 +106,24 @@ export function InputSection({ onSubmit, isLoading, error }: InputSectionProps) 
             <span>{displayError}</span>
           </div>
         )}
+
+        {/* Video generation toggle */}
+        <div className="flex items-center gap-3 p-4 bg-dark-card border border-dark-border rounded-xl">
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={includeVideo}
+              onChange={(e) => setIncludeVideo(e.target.checked)}
+              disabled={isLoading}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-purple rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-purple"></div>
+          </label>
+          <div className="flex flex-col">
+            <span className="text-white font-medium">Generate Video</span>
+            <span className="text-gray-400 text-sm">Create an editorial video from the generated image</span>
+          </div>
+        </div>
 
         <button
           type="submit"

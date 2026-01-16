@@ -75,29 +75,39 @@ export class VideoGenerationService {
   }
 
   /**
-   * Generates an editorial video based on the design brief and product images
+   * Generates an editorial video based on the design brief
    * 
-   * Uses the best quality product image as input for accurate product representation.
+   * Uses the provided source image (e.g., generated editorial image) as input for video generation.
+   * Falls back to product images if no source image is provided.
    */
   async generateVideo(
     brief: DesignBrief,
-    productData: ProductData
+    productData: ProductData,
+    sourceImagePath?: string
   ): Promise<{ filePath: string; url: string; thumbnail?: string }> {
     const prompt = this.constructVideoPrompt(brief, productData);
     
     try {
-      // Select the best quality product image for video generation
-      const selectedImage = this.selectBestImageForVideo(productData);
-      const productImagePath = selectedImage?.path;
+      // Use provided source image (generated editorial image) or fall back to product images
+      let productImagePath: string | undefined;
+      
+      if (sourceImagePath && fs.existsSync(sourceImagePath)) {
+        console.log('Using generated editorial image as video input:', sourceImagePath);
+        productImagePath = sourceImagePath;
+      } else {
+        // Fall back to best product image
+        const selectedImage = this.selectBestImageForVideo(productData);
+        productImagePath = selectedImage?.path;
+        if (selectedImage?.metadata) {
+          console.log('Image quality score:', selectedImage.metadata.qualityScore);
+          console.log('Image view type:', selectedImage.metadata.viewType);
+        }
+      }
       
       console.log('========== Video Generation ==========');
       console.log('Product:', productData.name);
       console.log('Prompt:', prompt.substring(0, 200) + '...');
-      console.log('Product image:', productImagePath || 'None');
-      if (selectedImage?.metadata) {
-        console.log('Image quality score:', selectedImage.metadata.qualityScore);
-        console.log('Image view type:', selectedImage.metadata.viewType);
-      }
+      console.log('Source image:', productImagePath || 'None');
       console.log('=======================================');
       
       // Generate video using Vertex AI Veo
