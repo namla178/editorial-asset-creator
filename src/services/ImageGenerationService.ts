@@ -8,12 +8,12 @@ import { webScraperService } from './WebScraperService';
 import { logRequest, logResponse, logError } from '@/utils/logger';
 
 /**
- * Service for generating images using Vertex AI Imagen (Nano Banana model)
+ * Service for generating images using Vertex AI Gemini 2.5 Flash Image
  * 
- * Uses Imagen 3 for high-quality editorial-style image generation with product
- * images as reference input for consistent product representation.
+ * Uses Gemini 2.5 Flash Image for high-quality editorial-style image generation
+ * with product images as reference input for consistent product representation.
  * 
- * Now implements smart image selection using quality scores and metadata.
+ * Implements smart image selection using quality scores and metadata.
  */
 export class ImageGenerationService {
   private vertexAI: VertexAI | null = null;
@@ -77,20 +77,20 @@ export class ImageGenerationService {
   /**
    * Generates an editorial image based on the design brief and product images
    * 
-   * Uses the best quality product image as reference for accurate product representation.
+   * Uses Gemini 2.5 Flash Image for all image generation.
    */
   async generateImage(
     brief: DesignBrief,
     productData: ProductData
   ): Promise<{ filePath: string; url: string }> {
-    const prompt = this.constructImagePrompt(brief, productData);
-    
     try {
       // Select the best quality product image for reference
       const selectedImage = this.selectBestProductImage(productData);
       const productImagePath = selectedImage?.path;
       
-      // Generate image using Vertex AI with product image as reference
+      // Use Gemini 2.5 Flash Image for image generation
+      const prompt = this.constructImagePrompt(brief, productData);
+      console.log('Using Gemini 2.5 Flash Image API for image generation');
       const imageData = await this.callImageGenerationAPI(prompt, productImagePath);
       
       // Save image to disk
@@ -162,7 +162,8 @@ CRITICAL: The image MUST show a person using or interacting with this product in
   }
 
   /**
-   * Calls the Vertex AI API to generate an image (with optional product image reference)
+   * Calls the Vertex AI Gemini 2.5 Flash Image API to generate an image
+   * Uses the generateContent endpoint with responseModalities: ['IMAGE']
    */
   private async callImageGenerationAPI(prompt: string, productImagePath?: string): Promise<string> {
     // If not configured or in development, use placeholder
@@ -172,11 +173,11 @@ CRITICAL: The image MUST show a person using or interacting with this product in
     }
 
     // Debug: Log configuration
-    console.log('Vertex AI Configuration:');
+    console.log('Gemini 2.5 Flash Image Configuration:');
     console.log('  Project:', process.env.GOOGLE_CLOUD_PROJECT);
     console.log('  Region:', process.env.GOOGLE_CLOUD_REGION || 'us-central1');
     console.log('  Credentials file:', process.env.GOOGLE_APPLICATION_CREDENTIALS);
-    console.log('  Model: imagen-3.0-generate-001');
+    console.log('  Model: gemini-2.5-flash-image');
     if (productImagePath) {
       console.log('  Product image:', productImagePath);
     }
@@ -184,7 +185,6 @@ CRITICAL: The image MUST show a person using or interacting with this product in
     // Check if credentials file exists
     const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
     if (credPath) {
-      const fs = require('fs');
       if (fs.existsSync(credPath)) {
         console.log('  Credentials file exists: YES');
       } else {
@@ -195,12 +195,12 @@ CRITICAL: The image MUST show a person using or interacting with this product in
     }
 
     try {
-      // Use Imagen 3 for image generation via REST API
+      // Use Gemini 2.5 Flash Image for image generation via REST API
       const project = process.env.GOOGLE_CLOUD_PROJECT;
       const location = process.env.GOOGLE_CLOUD_REGION || 'us-central1';
-      const model = 'imagen-3.0-generate-001';
+      const model = 'gemini-2.5-flash-image';
       
-      const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${model}:predict`;
+      const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${model}:generateContent`;
       
       // Get access token from service account
       const { GoogleAuth } = require('google-auth-library');
@@ -211,40 +211,47 @@ CRITICAL: The image MUST show a person using or interacting with this product in
       const client = await auth.getClient();
       const accessToken = await client.getAccessToken();
       
-      // Build request body - include product image if available
-      const fs = require('fs');
-      const instance: { prompt: string; image?: { bytesBase64Encoded: string } } = {
-        prompt: prompt,
-      };
+      // Build request contents - include product image if available
+      const contents: Array<{ role: string; parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> }> = [];
+      const parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [];
 
       // Add product image as reference if available
       if (productImagePath && fs.existsSync(productImagePath)) {
         const imageBuffer = fs.readFileSync(productImagePath);
-        instance.image = {
-          bytesBase64Encoded: imageBuffer.toString('base64'),
-        };
+        const mimeType = productImagePath.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+        parts.push({
+          inlineData: {
+            mimeType: mimeType,
+            data: imageBuffer.toString('base64'),
+          },
+        });
         console.log('  Including product image as reference');
       }
 
+      // Add the text prompt
+      parts.push({ text: prompt });
+
+      contents.push({
+        role: 'user',
+        parts: parts,
+      });
+
       const requestBody = {
-        instances: [instance],
-        parameters: {
-          sampleCount: 1,
-          aspectRatio: '1:1',
-          safetyFilterLevel: 'block_some',
-          personGeneration: 'allow_adult',
+        contents: contents,
+        generationConfig: {
+          responseModalities: ['IMAGE', 'TEXT'],
+          temperature: 1.0,
         },
       };
 
-      // Log the request (with base64 truncation)
-      logRequest('Vertex AI Imagen 3', 'generateImage', {
+      // Log the request
+      logRequest('Gemini 2.5 Flash Image', 'generateImage', {
         endpoint,
         model,
         promptLength: prompt.length,
         promptPreview: prompt.substring(0, 300),
-        hasProductImage: !!instance.image,
-        productImageSize: instance.image ? `${Math.round(instance.image.bytesBase64Encoded.length / 1024)}KB` : null,
-        parameters: requestBody.parameters,
+        hasProductImage: parts.length > 1,
+        generationConfig: requestBody.generationConfig,
       });
 
       const response = await fetch(endpoint, {
@@ -258,34 +265,37 @@ CRITICAL: The image MUST show a person using or interacting with this product in
 
       if (!response.ok) {
         const errorText = await response.text();
-        logError('Vertex AI Imagen 3', 'generateImage', new Error(`${response.status} - ${errorText}`), {
+        logError('Gemini 2.5 Flash Image', 'generateImage', new Error(`${response.status} - ${errorText}`), {
           status: response.status,
           statusText: response.statusText,
         });
-        throw new Error(`Imagen API error: ${response.status} - ${errorText}`);
+        throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json();
       
-      logResponse('Vertex AI Imagen 3', 'generateImage', {
+      logResponse('Gemini 2.5 Flash Image', 'generateImage', {
         status: response.status,
         statusText: response.statusText,
-        hasPredictions: !!result.predictions,
-        predictionsCount: result.predictions?.length || 0,
-        imageDataSize: result.predictions?.[0]?.bytesBase64Encoded 
-          ? `${Math.round(result.predictions[0].bytesBase64Encoded.length / 1024)}KB`
-          : null,
+        hasCandidates: !!result.candidates,
+        candidatesCount: result.candidates?.length || 0,
       });
       
       // Extract base64 image from response
-      if (result.predictions && result.predictions[0] && result.predictions[0].bytesBase64Encoded) {
-        return result.predictions[0].bytesBase64Encoded;
+      // Gemini returns candidates[].content.parts[] with inlineData for images
+      if (result.candidates && result.candidates[0]?.content?.parts) {
+        for (const part of result.candidates[0].content.parts) {
+          if (part.inlineData?.data) {
+            console.log('Gemini 2.5 Flash Image generation successful!');
+            return part.inlineData.data;
+          }
+        }
       }
       
-      throw new Error('No image data in Imagen response');
+      throw new Error('No image data in Gemini response');
     } catch (error) {
       const err = error as Error;
-      console.error('Vertex AI API error:', err.message);
+      console.error('Gemini 2.5 Flash Image API error:', err.message);
       console.error('Full error:', error);
       
       // For development/testing, return a placeholder

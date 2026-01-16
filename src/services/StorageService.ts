@@ -132,8 +132,8 @@ export class StorageService {
    */
   getFile(assetId: string): { buffer: Buffer; filename: string; mimeType: string } | null {
     // Find the asset across all jobs
-    for (const job of jobStore.values()) {
-      const asset = job.assets.find(a => a.id === assetId);
+    for (const job of Array.from(jobStore.values())) {
+      const asset = job.assets.find((a: GeneratedAsset) => a.id === assetId);
       if (asset && fs.existsSync(asset.filePath)) {
         const buffer = fs.readFileSync(asset.filePath);
         const filename = path.basename(asset.filePath);
@@ -150,8 +150,8 @@ export class StorageService {
    * Gets file path for an asset
    */
   getAssetFilePath(assetId: string): string | null {
-    for (const job of jobStore.values()) {
-      const asset = job.assets.find(a => a.id === assetId);
+    for (const job of Array.from(jobStore.values())) {
+      const asset = job.assets.find((a: GeneratedAsset) => a.id === assetId);
       if (asset) {
         return asset.filePath;
       }
@@ -166,7 +166,7 @@ export class StorageService {
     const now = Date.now();
     let deletedCount = 0;
 
-    for (const [jobId, job] of jobStore.entries()) {
+    for (const [jobId, job] of Array.from(jobStore.entries())) {
       const jobAge = now - job.createdAt.getTime();
       
       if (jobAge > maxAgeMs || job.status === 'failed') {
