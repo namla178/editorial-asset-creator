@@ -75,6 +75,31 @@ export class ImageGenerationService {
   }
 
   /**
+   * Cleans up crawled product images after successful generation
+   * Call this after all asset generation (images and videos) is complete
+   */
+  public cleanupCrawledImages(productData: ProductData): void {
+    if (!productData.localImagePaths || productData.localImagePaths.length === 0) {
+      return;
+    }
+
+    console.log(`Cleaning up ${productData.localImagePaths.length} crawled images...`);
+    
+    for (const imagePath of productData.localImagePaths) {
+      try {
+        if (fs.existsSync(imagePath)) {
+          fs.unlinkSync(imagePath);
+          console.log(`  Deleted: ${imagePath}`);
+        }
+      } catch (error) {
+        console.warn(`  Failed to delete ${imagePath}:`, (error as Error).message);
+      }
+    }
+    
+    console.log('Crawled images cleanup completed');
+  }
+
+  /**
    * Generates an editorial image based on the design brief and product images
    * 
    * Uses Gemini 2.5 Flash Image for all image generation.

@@ -156,6 +156,9 @@ async function processJob(
       storageService.addAssetToJob(jobId, videoAsset);
     }
 
+    // Clean up crawled images after all generation is complete
+    imageGenerationService.cleanupCrawledImages(productData);
+
     // Complete job
     storageService.updateJob(jobId, {
       status: 'completed',
