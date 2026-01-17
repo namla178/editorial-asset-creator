@@ -73,74 +73,29 @@ export class WebScraperService {
 
     logRequest('WebScraper', 'scrapeProductPage', { url });
 
-    let lastError: Error | null = null;
-
-    // Try fast axios-based scraping first
-    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
-      try {
-        const productData = await this.attemptScrape(url);
-        
-        logResponse('WebScraper', 'scrapeProductPage', {
-          url,
-          productName: productData.name,
-          imagesFound: productData.images?.length || 0,
-          localImagesDownloaded: productData.localImagePaths?.length || 0,
-          hasMetadata: !!productData.imageMetadata,
-        });
-        
-        return productData;
-      } catch (error) {
-        lastError = error as Error;
-        console.log(`  ✗ Attempt ${attempt} failed: ${lastError.message}`);
-        
-        if (attempt < this.maxRetries) {
-          const delay = 2000; // 2 seconds between retries
-          console.log(`  ⏳ Waiting ${delay/1000}s before retry...`);
-          await this.sleep(delay);
-        }
-      }
-    }
-
-    // Check if error indicates bot blocking (timeout, ECONNRESET, 403)
-    const errorCode = (lastError as any)?.code;
-    const errorMessage = lastError?.message || '';
+    // Use Puppeteer as primary method for reliability
+    console.log('\n  🤖 Using Puppeteer (headless browser) for maximum compatibility...');
     
-    console.log(`\n  [DEBUG] Final error code: ${errorCode}, message: ${errorMessage.substring(0, 100)}`);
-    
-    const isBlockingError = 
-      errorCode === 'ECONNRESET' || 
-      errorCode === 'ECONNABORTED' ||
-      errorCode === 'ETIMEDOUT' ||
-      errorMessage.includes('timeout') ||
-      errorMessage.includes('took too long') ||
-      errorMessage.includes('403') ||
-      errorMessage.includes('blocking') ||
-      errorMessage.includes('NEEDS_JS_RENDERING'); // JavaScript-heavy sites like Shopee
-
-    if (isBlockingError) {
-      const reason = errorMessage.includes('NEEDS_JS_RENDERING') 
-        ? 'JavaScript rendering required' 
-        : 'Axios blocked';
-      console.log(`\n  🤖 ${reason} - switching to Puppeteer (headless browser)...`);
-      try {
-        const productData = await this.scrapeWithPuppeteer(url);
-        logResponse('WebScraper', 'scrapeProductPage', {
-          method: 'puppeteer',
-          url,
-          productName: productData.name,
-          imagesFound: productData.images?.length || 0,
-          localImagesDownloaded: productData.localImagePaths?.length || 0,
-          hasMetadata: !!productData.imageMetadata,
-        });
-        return productData;
-      } catch (puppeteerError) {
-        console.log(`  ✗ Puppeteer also failed: ${(puppeteerError as Error).message}`);
-        throw new Error(`Both Axios and Puppeteer failed. The website has very strict anti-bot protection. Try a different product URL from Amazon, Nike, or ASOS.`);
-      }
+    try {
+      const productData = await this.scrapeWithPuppeteer(url);
+      
+      logResponse('WebScraper', 'scrapeProductPage', {
+        method: 'puppeteer',
+        url,
+        productName: productData.name,
+        imagesFound: productData.images?.length || 0,
+        localImagesDownloaded: productData.localImagePaths?.length || 0,
+        hasMetadata: !!productData.imageMetadata,
+      });
+      
+      return productData;
+    } catch (error) {
+      const errorMessage = (error as Error).message;
+      console.log(`  ✗ Puppeteer failed: ${errorMessage}`);
+      
+      logError('WebScraper', 'scrapeProductPage', error as Error, { url, method: 'puppeteer' });
+      throw new Error(`Failed to scrape product page: ${errorMessage}. Please make sure the URL is a direct product page.`);
     }
-
-    logError('WebScraper', 'scrapeProductPage', lastError!, { url, attempts: this.maxRetries });
-    throw new Error(`Failed to scrape product page after ${this.maxRetries} attempts: ${lastError?.message}`);
   }
 
   /**
@@ -228,7 +183,7 @@ export class WebScraperService {
   /**
    * Parses HTML to extract product data
    */
-  private async parseProductPage(url: string, html: string, allowEmpty = false): Promise<ProductData> {
+  private async parseProductPage(url: string, html: string): Promise<ProductData> {
     const $ = cheerio.load(html);
 
     const name = this.extractProductName($);
@@ -245,9 +200,8 @@ export class WebScraperService {
     console.log('='.repeat(60));
     const brand = this.extractProductBrand($);
 
-    if (!name && !allowEmpty) {
-      // Instead of throwing error, signal that we need JavaScript rendering
-      throw new Error('NEEDS_JS_RENDERING');
+    if (!name) {
+      throw new Error('Unable to find product information on this page. Please make sure you\'re using a direct product page URL (not a search results or category page).');
     }
 
     // Download product images locally with comprehensive metadata
@@ -1212,8 +1166,8 @@ export class WebScraperService {
       await browser.close();
       console.log('  ✓ Browser closed');
 
-      // Parse the HTML using existing parser (allow empty since we tried our best)
-      return this.parseProductPage(url, html, true);
+      // Parse the HTML using existing parser
+      return this.parseProductPage(url, html);
     } catch (error) {
       await browser.close();
       throw error;

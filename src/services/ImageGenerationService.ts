@@ -47,6 +47,29 @@ export class ImageGenerationService {
   }
 
   /**
+   * Creates a job-specific folder structure
+   */
+  private createJobFolder(jobId: string): string {
+    const jobFolder = path.join(this.outputDir, jobId);
+    if (!fs.existsSync(jobFolder)) {
+      fs.mkdirSync(jobFolder, { recursive: true });
+    }
+    return jobFolder;
+  }
+
+  /**
+   * Copies input image to job folder
+   */
+  private copyInputImage(sourcePath: string, jobId: string): string {
+    const jobFolder = this.createJobFolder(jobId);
+    const ext = path.extname(sourcePath);
+    const destPath = path.join(jobFolder, `input${ext}`);
+    fs.copyFileSync(sourcePath, destPath);
+    console.log(`Copied input image to: ${destPath}`);
+    return destPath;
+  }
+
+  /**
    * Selects the best quality product image for reference using metadata
    */
   private selectBestProductImage(productData: ProductData): { path: string; metadata?: ImageMetadata } | undefined {
@@ -78,7 +101,7 @@ export class ImageGenerationService {
    * Cleans up crawled product images after successful generation
    * Call this after all asset generation (images and videos) is complete
    */
-  public cleanupCrawledImages(productData: ProductData): void {
+  public async cleanupCrawledImages(productData: ProductData): Promise<void> {
     //return;
     if (!productData.localImagePaths || productData.localImagePaths.length === 0) {
       return;
@@ -86,18 +109,44 @@ export class ImageGenerationService {
 
     console.log(`Cleaning up ${productData.localImagePaths.length} crawled images...`);
     
+    // Add longer delay to ensure all file handles are released (especially Sharp)
+    await this.sleep(3000);
+    
     for (const imagePath of productData.localImagePaths) {
-      try {
-        if (fs.existsSync(imagePath)) {
-          fs.unlinkSync(imagePath);
-          console.log(`  Deleted: ${imagePath}`);
+      let retries = 5;
+      let deleted = false;
+      
+      while (retries > 0 && !deleted) {
+        try {
+          if (fs.existsSync(imagePath)) {
+            fs.unlinkSync(imagePath);
+            console.log(`  ✓ Deleted: ${path.basename(imagePath)}`);
+            deleted = true;
+          } else {
+            deleted = true; // File doesn't exist, consider it deleted
+          }
+        } catch (error) {
+          retries--;
+          if (retries > 0) {
+            // Exponential backoff: 1s, 2s, 3s, 4s, 5s
+            const delay = (6 - retries) * 1000;
+            await this.sleep(delay);
+          } else {
+            // Skip files that are locked - they'll be cleaned up later
+            console.log(`  ⚠ Skipped (file locked): ${path.basename(imagePath)}`);
+          }
         }
-      } catch (error) {
-        console.warn(`  Failed to delete ${imagePath}:`, (error as Error).message);
       }
     }
     
     console.log('Crawled images cleanup completed');
+  }
+
+  /**
+   * Sleep utility for delays
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**
@@ -107,21 +156,30 @@ export class ImageGenerationService {
    */
   async generateImage(
     brief: DesignBrief,
-    productData: ProductData
-  ): Promise<{ filePath: string; url: string }> {
+    productData: ProductData,
+    jobId: string
+  ): Promise<{ filePath: string; url: string; inputImagePath?: string }> {
     try {
       // Select the best quality product image for reference
       const selectedImage = this.selectBestProductImage(productData);
       const productImagePath = selectedImage?.path;
+      let inputImagePath: string | undefined;
+      
+      // Copy input image to job folder if available
+      if (productImagePath) {
+        inputImagePath = this.copyInputImage(productImagePath, jobId);
+      }
       
       // Use Gemini 2.5 Flash Image for image generation
       const prompt = this.constructImagePrompt(brief, productData);
       console.log('Using Gemini 2.5 Flash Image API for image generation');
       const imageData = await this.callImageGenerationAPI(prompt, productImagePath);
       
-      // Save image to disk
-      const filename = `${uuidv4()}.png`;
-      const filePath = path.join(this.outputDir, filename);
+      // Save image to job folder
+      const jobFolder = this.createJobFolder(jobId);
+      const timestamp = Date.now();
+      const filename = `output-${timestamp}.png`;
+      const filePath = path.join(jobFolder, filename);
       
       // Decode base64 image data
       const buffer = Buffer.from(imageData, 'base64');
@@ -140,11 +198,17 @@ export class ImageGenerationService {
       }
       
       // Add text overlay using sharp
-      const finalPath = await this.addTextOverlay(filePath, brief);
+      const finalPath = await this.addTextOverlay(filePath, brief, jobId);
+      
+      // Force cleanup to release file handles
+      if (global.gc) {
+        global.gc();
+      }
       
       return {
         filePath: finalPath,
-        url: `/generated/${path.basename(finalPath)}`,
+        url: `/generated/${jobId}/${path.basename(finalPath)}`,
+        inputImagePath,
       };
     } catch (error) {
       console.error('Image generation failed:', error);
@@ -322,6 +386,11 @@ CRITICAL: The image MUST show a person using or interacting with this product in
 
       const result = await response.json();
       
+      // Log full response for debugging
+      console.log('========== Gemini Full Response ==========');
+      console.log(JSON.stringify(result, null, 2));
+      console.log('==========================================');
+      
       logResponse('Gemini 2.5 Flash Image', 'generateImage', {
         status: response.status,
         statusText: response.statusText,
@@ -340,6 +409,14 @@ CRITICAL: The image MUST show a person using or interacting with this product in
         }
       }
       
+      console.log('ERROR: No image found in response structure:');
+      console.log('  Has candidates:', !!result.candidates);
+      console.log('  Candidates length:', result.candidates?.length || 0);
+      console.log('  First candidate:', result.candidates?.[0] ? 'exists' : 'missing');
+      console.log('  Has content:', !!result.candidates?.[0]?.content);
+      console.log('  Has parts:', !!result.candidates?.[0]?.content?.parts);
+      console.log('  Parts:', JSON.stringify(result.candidates?.[0]?.content?.parts, null, 2));
+      
       throw new Error('No image data in Gemini response');
     } catch (error) {
       const err = error as Error;
@@ -355,7 +432,7 @@ CRITICAL: The image MUST show a person using or interacting with this product in
   /**
    * Adds text overlay to the generated image using sharp
    */
-  private async addTextOverlay(imagePath: string, brief: DesignBrief): Promise<string> {
+  private async addTextOverlay(imagePath: string, brief: DesignBrief, jobId: string): Promise<string> {
     try {
       const image = sharp(imagePath);
       const metadata = await image.metadata();
@@ -379,8 +456,9 @@ CRITICAL: The image MUST show a person using or interacting with this product in
         </svg>
       `;
 
+      const jobFolder = this.createJobFolder(jobId);
       const outputFilename = `${uuidv4()}_overlay.png`;
-      const outputPath = path.join(this.outputDir, outputFilename);
+      const outputPath = path.join(jobFolder, outputFilename);
 
       await image
         .composite([
@@ -449,14 +527,15 @@ CRITICAL: The image MUST show a person using or interacting with this product in
   async generateMultipleImages(
     brief: DesignBrief,
     productData: ProductData,
+    jobId: string,
     count: number = 3
-  ): Promise<Array<{ filePath: string; url: string }>> {
-    const results: Array<{ filePath: string; url: string }> = [];
+  ): Promise<Array<{ filePath: string; url: string; inputImagePath?: string }>> {
+    const results: Array<{ filePath: string; url: string; inputImagePath?: string }> = [];
     
     // Generate images sequentially to avoid rate limits
     for (let i = 0; i < count; i++) {
       try {
-        const result = await this.generateImage(brief, productData);
+        const result = await this.generateImage(brief, productData, jobId);
         results.push(result);
       } catch (error) {
         console.error(`Failed to generate image ${i + 1}:`, error);

@@ -111,6 +111,7 @@ async function processJob(
     const images = await imageGenerationService.generateMultipleImages(
       designBrief,
       productData,
+      jobId,
       imageCount
     );
 
@@ -141,6 +142,7 @@ async function processJob(
       const video = await videoGenerationService.generateVideo(
         designBrief,
         productData,
+        jobId,
         sourceImagePath
       );
 
@@ -161,7 +163,7 @@ async function processJob(
     }
 
     // Clean up crawled images after all generation is complete
-    imageGenerationService.cleanupCrawledImages(productData);
+    await imageGenerationService.cleanupCrawledImages(productData);
 
     // Complete job
     storageService.updateJob(jobId, {
