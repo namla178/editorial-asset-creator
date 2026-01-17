@@ -1,0 +1,180 @@
+{
+  "main_prompt": "You are an expert editorial art director, fashion brand strategist, and visual storyteller. Help me create editorial image following json structure below",
+  "image_url": "imageUrl",
+  "CRITICAL_PRODUCT_RULES": {
+    "rule_1_product_identity": "🔴 ABSOLUTE REQUIREMENT - You MUST use the EXACT product shown in the reference image. Example: If reference shows a NAVY BLUE HOODED JACKET → output MUST show NAVY BLUE HOODED JACKET. NOT olive green, NOT different style, NOT similar product. EXACT MATCH ONLY.",
+    "rule_2_no_variations": "🔴 ZERO TOLERANCE - Do NOT create variations, alternatives, or different versions. If reference = Product A → output = Product A. NOT Product B that looks similar.",
+    "rule_3_color_lock": "🔴 COLOR IS ABSOLUTE - Navy stays navy, black stays black, olive stays olive, white stays white. Do NOT shift hues, do NOT reinterpret for artistic effect. EXACT color matching required.",
+    "rule_4_design_lock": "🔴 DESIGN IS FROZEN - Every zipper, pocket, logo, patch, seam, hood, collar must match reference. Do NOT simplify, do NOT enhance, do NOT modify.",
+    "rule_5_reference_is_law": "🔴 REFERENCE IMAGE = SOURCE OF TRUTH - Your creative freedom applies ONLY to: scene composition, lighting, environment, person's pose. Your creative freedom does NOT apply to: product color, product design, product style, product features.",
+    "rule_6_validation_requirement": "🔴 BEFORE GENERATING - Ask yourself: Is this the EXACT SAME product? Would someone recognize this as the SAME product from reference? If answer is NO → STOP and use reference correctly."
+  },
+  "editorial_image_brief_v1_1": {
+    "product_human_interaction": {
+      "interaction_requirement": "MANDATORY - Person must be actively using/wearing/interacting with product",
+      "product_visibility": "50-70% - Product must be clearly identifiable",
+      "authenticity_level": "Real-world use case, not posed product display",
+      "color_accuracy": "CRITICAL - Preserve exact product colors from reference image. Do not alter, reinterpret, or stylize product colorway",
+      "product_identity_lock": "ABSOLUTE - This is THE EXACT product that must appear in the image. No substitutions, no alternatives, no similar items",
+      "product_reference_usage": "The provided product image is the ONLY valid reference. Do not generate different products, even if they seem similar or better suited to the scene",
+      "anti_hallucination": "Do NOT invent, imagine, or substitute products. Use ONLY what is shown in the reference image",
+      "examples_by_category": {
+        "footwear": "Person running/walking in natural environment",
+        "tech": "Person actively using device in lifestyle context",
+        "apparel": "Person wearing item in dynamic movement"
+      }
+    },
+    "final_validation_checklist": {
+      "must_have": [
+        "✓ Person actively using/wearing product",
+        "✓ Product visibility 50-70%",
+        "✓ Real-world lifestyle context",
+        "✓ Editorial quality (not commercial/stock)",
+        "✓ 2048x2048 ultra high resolution for maximum detail and quality"
+      ],
+      "quality_gates": [
+        "✓ Product features recognizable",
+        "✓ Human as primary/co-primary subject",
+        "✓ Authentic, not posed",
+        "✓ CRITICAL: Product matches reference image EXACTLY (same color, same design, same product)",
+        "✓ CRITICAL: No product substitution or variation occurred"
+      ]
+    },
+    "output_specifications": {
+      "dimensions": {
+        "default": "2048x2048",
+        "aspect_ratios": [
+          "1:1",
+          "16:9",
+          "4:5"
+        ]
+      },
+      "quality_requirements": {
+        "resolution": "2048x2048 ultra high resolution for editorial print quality",
+        "product_clarity": "Product features must be recognizable",
+        "human_presence": "Person must be primary or co-primary subject",
+        "color_fidelity": "Product colors must exactly match reference image - no reinterpretation or creative color changes",
+        "brand_consistency": "Preserve logos, patterns, and design elements exactly as shown in reference"
+      }
+    },
+    "campaign_meta": {
+      "project_name": "",
+      "brand_identity": "e.g., urban performance, sustainable minimalism, luxury streetwear",
+      "platform_use_case": "Lookbook | Campaign | Banner | Social Editorial",
+      "target_audience": {
+        "persona": "",
+        "emotional_driver": "e.g., freedom, rebellion, calm confidence"
+      }
+    },
+    "brand_gravity_profile": {
+      "brand_energy_level": "Low | Medium | High",
+      "attitude": "e.g., bold, restrained, experimental, utilitarian",
+      "risk_tolerance": "Low | Medium | High",
+      "visual_gravity": "e.g., heavy, grounded, aggressive | light, minimal, airy",
+      "references": [
+        "Optional: iconic campaigns, cultural movements, or visual eras"
+      ]
+    },
+    "editorial_constraints": {
+      "image_type": "Editorial",
+      "avoid_commercial_aesthetics": true,
+      "allowed_imperfection_level": "Low | Medium | High",
+      "authenticity_bias": "Prefer raw, imperfect, lived-in visuals"
+    },
+    "creative_concept": {
+      "core_mood": "e.g., raw, tense, poetic, defiant",
+      "narrative_theme": "One-sentence story behind the image",
+      "editorial_statement": "Clear, opinionated message this image communicates"
+    },
+    "visual_hierarchy": {
+      "primary_subject": "Product | Human | Environment",
+      "secondary_subjects": [
+        "Optional supporting elements"
+      ],
+      "frame_dominance": {
+        "primary_subject_percentage": "30-50%",
+        "secondary_subject_percentage": "10-30%"
+      }
+    },
+    "product_focus": {
+      "key_items": [
+        {
+          "product_name": "",
+          "category": "",
+          "colorway_or_variant": ""
+        }
+      ],
+      "visibility_style": "Integrated | Partial | Obscured | Symbolic",
+      "interaction_type": "Worn | Placed | In-motion | Environmental",
+      "reference_image_priority": "CRITICAL - Product appearance must match reference image exactly. Colors, textures, logos, and design details are non-negotiable"
+    },
+    "camera_and_composition": {
+      "camera_angle": "Low | Eye-level | High | Off-axis",
+      "lens_feel": "Wide, cinematic, compressed, slightly distorted",
+      "composition_style": "Asymmetrical | Center-weighted | Cropped | Dynamic",
+      "depth_of_field": "Shallow | Medium | Deep"
+    },
+    "setting_and_environment": {
+      "location_type": "Real-world, textured location",
+      "environmental_drama": [
+        "fog",
+        "rain",
+        "dust",
+        "wind",
+        "harsh sunlight"
+      ],
+      "time_of_day": "Golden hour | Overcast | Night | Harsh daylight"
+    },
+    "lifestyle_semantic_controls": {
+      "positive_signals": [
+        "raw movement",
+        "tension or contrast",
+        "individual focus",
+        "uncontrolled nature",
+        "weathered textures"
+      ],
+      "negative_signals": [
+        "forced smiles",
+        "group posing",
+        "studio cleanliness",
+        "perfect symmetry",
+        "stock photography lighting"
+      ]
+    },
+    "artistic_license": {
+      "reality_bending_allowed": true,
+      "surreal_elements": [
+        "Optional symbolic or exaggerated elements"
+      ],
+      "symbolism_notes": "If surreal, define the intended meaning"
+    },
+    "text_and_text_visual": {
+      "include_text": true,
+      "text_content": {
+        "headline": "",
+        "supporting_line": ""
+      },
+      "text_intent": "Declarative | Provocative | Poetic | Minimal",
+      "typography_style": {
+        "font_character": "Bold editorial | Condensed | Handwritten | Geometric",
+        "case_usage": "Uppercase | Sentence case | Mixed",
+        "weight": "Light | Regular | Bold | Extra Bold"
+      },
+      "text_placement": {
+        "position": "Top | Bottom | Center | Edge-aligned",
+        "interaction_with_subject": "Overlapping | Framing | Background-only",
+        "safe_area_rule": "Must not obstruct primary subject"
+      },
+      "text_visual_treatment": {
+        "color": "High contrast | Monochrome | Muted",
+        "effects": "None | Grain | Blur | Distress",
+        "integration_style": "Feels native to the image, not overlaid"
+      }
+    },
+    "post_production": {
+      "color_grading": "e.g., muted earth tones, cool shadows, high contrast",
+      "texture_treatment": "Film grain | Matte | Clean digital",
+      "final_mood_check": "Does the grading reinforce the core mood?"
+    }
+  }
+}
