@@ -190,7 +190,7 @@ export default function HomePage() {
 
   const showProgress = isLoading && status !== 'pending';
   const showDesignBrief = designBrief !== undefined;
-  const showOutput = assets.length > 0 && status === 'completed';
+  const showOutput = assets.length > 0; // Show output as soon as we have assets
 
   return (
     <main className="min-h-screen bg-dark-bg py-12">

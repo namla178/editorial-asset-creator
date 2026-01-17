@@ -47,6 +47,17 @@ export class VideoGenerationService {
   }
 
   /**
+   * Creates a job-specific folder structure
+   */
+  private createJobFolder(jobId: string): string {
+    const jobFolder = path.join(this.outputDir, jobId);
+    if (!fs.existsSync(jobFolder)) {
+      fs.mkdirSync(jobFolder, { recursive: true });
+    }
+    return jobFolder;
+  }
+
+  /**
    * Selects the best quality product image for video generation using metadata
    */
   private selectBestImageForVideo(productData: ProductData): { path: string; metadata?: ImageMetadata } | undefined {
@@ -83,6 +94,7 @@ export class VideoGenerationService {
   async generateVideo(
     brief: DesignBrief,
     productData: ProductData,
+    jobId: string,
     sourceImagePath?: string
   ): Promise<{ filePath: string; url: string; thumbnail?: string }> {
     const prompt = this.constructVideoPrompt(brief, productData);
@@ -113,9 +125,11 @@ export class VideoGenerationService {
       // Generate video using Vertex AI Veo
       const videoData = await this.callVideoGenerationAPI(prompt, productImagePath);
       
-      // Save video to disk
-      const filename = `${uuidv4()}.mp4`;
-      const filePath = path.join(this.outputDir, filename);
+      // Save video to job folder
+      const jobFolder = this.createJobFolder(jobId);
+      const timestamp = Date.now();
+      const filename = `video-${timestamp}.mp4`;
+      const filePath = path.join(jobFolder, filename);
       
       // Decode base64 video data
       const buffer = Buffer.from(videoData, 'base64');
@@ -128,7 +142,7 @@ export class VideoGenerationService {
       
       return {
         filePath,
-        url: `/generated/${filename}`,
+        url: `/generated/${jobId}/${filename}`,
         thumbnail: thumbnailUrl,
       };
     } catch (error) {
@@ -439,11 +453,12 @@ Technical specifications:
     count: number = 1
   ): Promise<Array<{ filePath: string; url: string; thumbnail?: string }>> {
     const results: Array<{ filePath: string; url: string; thumbnail?: string }> = [];
+    const jobId = uuidv4();
     
     for (let i = 0; i < count; i++) {
       try {
         console.log(`Generating video ${i + 1} of ${count}...`);
-        const result = await this.generateVideo(brief, productData);
+        const result = await this.generateVideo(brief, productData, jobId);
         results.push(result);
       } catch (error) {
         console.error(`Failed to generate video ${i + 1}:`, error);

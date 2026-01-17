@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { GeneratedAsset } from '@/types';
 
 interface OutputSectionProps {
@@ -21,6 +21,8 @@ export function OutputSection({
   onRegenerate,
   isVisible,
 }: OutputSectionProps) {
+  const [previewAsset, setPreviewAsset] = useState<GeneratedAsset | null>(null);
+
   if (!isVisible || assets.length === 0) {
     return null;
   }
@@ -57,9 +59,19 @@ export function OutputSection({
             key={asset.id}
             asset={asset}
             onDownload={() => onDownload(asset.id)}
+            onPreview={() => setPreviewAsset(asset)}
           />
         ))}
       </div>
+
+      {/* Preview Modal */}
+      {previewAsset && (
+        <PreviewModal
+          asset={previewAsset}
+          onClose={() => setPreviewAsset(null)}
+          onDownload={() => onDownload(previewAsset.id)}
+        />
+      )}
     </section>
   );
 }
@@ -67,16 +79,26 @@ export function OutputSection({
 interface AssetCardProps {
   asset: GeneratedAsset;
   onDownload: () => void;
+  onPreview: () => void;
 }
 
 /**
  * Individual asset card component
  */
-function AssetCard({ asset, onDownload }: AssetCardProps) {
+function AssetCard({ asset, onDownload, onPreview }: AssetCardProps) {
   const isVideo = asset.type === 'video';
 
+  const handleDoubleClick = () => {
+    if (!isVideo) {
+      onPreview();
+    }
+  };
+
   return (
-    <div className="group relative bg-dark-card border border-dark-border rounded-xl overflow-hidden transition-all duration-300 hover:border-accent-purple hover:shadow-lg hover:shadow-accent-purple/20">
+    <div 
+      className="group relative bg-dark-card border border-dark-border rounded-xl overflow-hidden transition-all duration-300 hover:border-accent-purple hover:shadow-lg hover:shadow-accent-purple/20"
+      onDoubleClick={handleDoubleClick}
+    >
       {/* Preview */}
       <div className="aspect-square relative overflow-hidden bg-dark-bg">
         {isVideo ? (
@@ -84,26 +106,46 @@ function AssetCard({ asset, onDownload }: AssetCardProps) {
             src={asset.url}
             className="w-full h-full object-cover"
             controls
+            controlsList="nodownload"
             poster={asset.thumbnail}
+            playsInline
           />
         ) : (
           <img
             src={asset.url}
             alt={asset.title}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 cursor-pointer"
           />
         )}
 
-        {/* Overlay on hover */}
-        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-          <button
-            onClick={onDownload}
-            className="px-6 py-3 bg-white text-dark-bg font-semibold rounded-lg hover:bg-gray-100 transition-colors flex items-center gap-2"
-          >
-            <DownloadIcon />
-            Download
-          </button>
-        </div>
+        {/* Overlay on hover (only for images) */}
+        {!isVideo && (
+          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-3">
+              <button
+                onClick={onDownload}
+                className="px-6 py-3 bg-white text-dark-bg font-semibold rounded-lg hover:bg-gray-100 transition-colors flex items-center gap-2"
+              >
+                <DownloadIcon />
+                Download
+              </button>
+              <span className="text-white text-sm">Double-click to preview</span>
+            </div>
+          </div>
+        )}
+
+        {/* Download button for videos */}
+        {isVideo && (
+          <div className="absolute top-3 left-3">
+            <button
+              onClick={onDownload}
+              className="px-3 py-2 bg-black/70 text-white rounded-lg hover:bg-black/90 transition-colors flex items-center gap-2 text-sm"
+            >
+              <DownloadIcon />
+              Download
+            </button>
+          </div>
+        )}
 
         {/* Type badge */}
         <div className="absolute top-3 right-3">
@@ -178,6 +220,202 @@ function RefreshIcon() {
         d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
       />
     </svg>
+  );
+}
+
+/**
+ * Close icon component
+ */
+function CloseIcon() {
+  return (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M6 18L18 6M6 6l12 12"
+      />
+    </svg>
+  );
+}
+
+/**
+ * Zoom In icon component
+ */
+function ZoomInIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"
+      />
+    </svg>
+  );
+}
+
+/**
+ * Zoom Out icon component
+ */
+function ZoomOutIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"
+      />
+    </svg>
+  );
+}
+
+/**
+ * Reset icon component
+ */
+function ResetIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+      />
+    </svg>
+  );
+}
+
+interface PreviewModalProps {
+  asset: GeneratedAsset;
+  onClose: () => void;
+  onDownload: () => void;
+}
+
+/**
+ * Preview modal for images with zoom functionality
+ */
+function PreviewModal({ asset, onClose, onDownload }: PreviewModalProps) {
+  const [zoom, setZoom] = useState(1);
+  const MIN_ZOOM = 0.5;
+  const MAX_ZOOM = 3;
+  const ZOOM_STEP = 0.25;
+
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
+  const handleZoomIn = () => {
+    setZoom(prev => Math.min(prev + ZOOM_STEP, MAX_ZOOM));
+  };
+
+  const handleZoomOut = () => {
+    setZoom(prev => Math.max(prev - ZOOM_STEP, MIN_ZOOM));
+  };
+
+  const handleResetZoom = () => {
+    setZoom(1);
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    if (e.deltaY < 0) {
+      handleZoomIn();
+    } else {
+      handleZoomOut();
+    }
+  };
+
+  return (
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm"
+      onClick={handleBackdropClick}
+    >
+      <div className="relative max-w-7xl max-h-[90vh] mx-4">
+        {/* Top controls */}
+        <div className="absolute -top-12 right-0 flex items-center gap-3">
+          {/* Zoom controls */}
+          <div className="flex items-center gap-2 bg-dark-card/80 backdrop-blur-sm rounded-lg px-3 py-2">
+            <button
+              onClick={handleZoomOut}
+              disabled={zoom <= MIN_ZOOM}
+              className="p-1 text-white hover:text-accent-purple transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Zoom out"
+            >
+              <ZoomOutIcon />
+            </button>
+            <span className="text-white text-sm font-medium min-w-[3rem] text-center">
+              {Math.round(zoom * 100)}%
+            </span>
+            <button
+              onClick={handleZoomIn}
+              disabled={zoom >= MAX_ZOOM}
+              className="p-1 text-white hover:text-accent-purple transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Zoom in"
+            >
+              <ZoomInIcon />
+            </button>
+            <div className="w-px h-5 bg-gray-600 mx-1" />
+            <button
+              onClick={handleResetZoom}
+              className="p-1 text-white hover:text-accent-purple transition-colors"
+              aria-label="Reset zoom"
+            >
+              <ResetIcon />
+            </button>
+          </div>
+          
+          {/* Close button */}
+          <button
+            onClick={onClose}
+            className="p-2 text-white hover:text-gray-300 transition-colors bg-dark-card/80 backdrop-blur-sm rounded-lg"
+            aria-label="Close preview"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+
+        {/* Image container with zoom */}
+        <div 
+          className="overflow-auto max-h-[80vh] rounded-lg"
+          onWheel={handleWheel}
+        >
+          <img
+            src={asset.url}
+            alt={asset.title}
+            className="object-contain rounded-lg transition-transform duration-200"
+            style={{ 
+              transform: `scale(${zoom})`,
+              transformOrigin: 'center center',
+              maxWidth: '90vw',
+              maxHeight: '80vh'
+            }}
+          />
+        </div>
+
+        {/* Info and actions */}
+        <div className="mt-4 flex items-center justify-between bg-dark-card/80 backdrop-blur-sm rounded-lg p-4">
+          <div>
+            <h3 className="text-white font-semibold text-lg">{asset.title}</h3>
+            <p className="text-gray-400 text-sm mt-1">{asset.description}</p>
+            <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
+              <span>{asset.metadata.width}x{asset.metadata.height}</span>
+              <span>{formatFileSize(asset.metadata.size)}</span>
+            </div>
+          </div>
+          <button
+            onClick={onDownload}
+            className="px-6 py-3 bg-accent-purple text-white rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2"
+          >
+            <DownloadIcon />
+            Download
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

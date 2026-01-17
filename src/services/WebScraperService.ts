@@ -5,20 +5,32 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import sharp from 'sharp';
+import https from 'https';
 import { logRequest, logResponse, logError } from '@/utils/logger';
+import puppeteer from 'puppeteer';
 
 /**
  * Service for scraping product data from e-commerce pages
  * Implements comprehensive image extraction with metadata tracking
  */
 export class WebScraperService {
-  private readonly timeout = 30000; // 30 seconds
-  private readonly maxRetries = 3;
+  private readonly timeout = 5000; // 15 seconds - quick timeout to detect blocking fast
+  private readonly maxRetries = 1; // Reduced retries since we have fallback
   private readonly userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
   private readonly downloadDir: string;
+  private readonly httpsAgent: https.Agent;
 
   constructor() {
     this.downloadDir = path.join(process.cwd(), 'public', 'product-images');
+    // Create custom HTTPS agent to avoid connection resets
+    this.httpsAgent = new https.Agent({
+      rejectUnauthorized: false, // Accept self-signed certificates
+      keepAlive: true,
+      keepAliveMsecs: 30000,
+      maxSockets: 50,
+      maxFreeSockets: 10,
+      timeout: 60000,
+    });
     this.ensureDownloadDir();
   }
 
@@ -61,34 +73,29 @@ export class WebScraperService {
 
     logRequest('WebScraper', 'scrapeProductPage', { url });
 
-    let lastError: Error | null = null;
-
-    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
-      try {
-        const productData = await this.attemptScrape(url);
-        
-        logResponse('WebScraper', 'scrapeProductPage', {
-          url,
-          productName: productData.name,
-          imagesFound: productData.images?.length || 0,
-          localImagesDownloaded: productData.localImagePaths?.length || 0,
-          hasMetadata: !!productData.imageMetadata,
-        });
-        
-        return productData;
-      } catch (error) {
-        lastError = error as Error;
-        
-        if (attempt < this.maxRetries) {
-          // Exponential backoff: 1s, 2s, 4s
-          const delay = Math.pow(2, attempt - 1) * 1000;
-          await this.sleep(delay);
-        }
-      }
+    // Use Puppeteer as primary method for reliability
+    console.log('\n  🤖 Using Puppeteer (headless browser) for maximum compatibility...');
+    
+    try {
+      const productData = await this.scrapeWithPuppeteer(url);
+      
+      logResponse('WebScraper', 'scrapeProductPage', {
+        method: 'puppeteer',
+        url,
+        productName: productData.name,
+        imagesFound: productData.images?.length || 0,
+        localImagesDownloaded: productData.localImagePaths?.length || 0,
+        hasMetadata: !!productData.imageMetadata,
+      });
+      
+      return productData;
+    } catch (error) {
+      const errorMessage = (error as Error).message;
+      console.log(`  ✗ Puppeteer failed: ${errorMessage}`);
+      
+      logError('WebScraper', 'scrapeProductPage', error as Error, { url, method: 'puppeteer' });
+      throw new Error(`Failed to scrape product page: ${errorMessage}. Please make sure the URL is a direct product page.`);
     }
-
-    logError('WebScraper', 'scrapeProductPage', lastError!, { url, attempts: this.maxRetries });
-    throw new Error(`Failed to scrape product page after ${this.maxRetries} attempts: ${lastError?.message}`);
   }
 
   /**
@@ -96,14 +103,60 @@ export class WebScraperService {
    */
   private async attemptScrape(url: string): Promise<ProductData> {
     try {
+      console.log(`  Fetching page: ${url}`);
+      console.log(`  Timeout: ${this.timeout}ms`);
+      
+      // Parse URL to get referrer
+      const urlObj = new URL(url);
+      const baseUrl = `${urlObj.protocol}//${urlObj.host}`;
+      const domain = urlObj.hostname.toLowerCase();
+      
+      // Known problematic domains that require special handling
+      const strictDomains = ['tommy.com', 'tommyhilfiger.com'];
+      const isStrictDomain = strictDomains.some(d => domain.includes(d));
+      
+      if (isStrictDomain) {
+        console.log(`  ⚠️  WARNING: ${domain} has strict anti-bot protection.`);
+        console.log(`  💡 RECOMMENDED: Use a product from Amazon, Nike, ASOS, or Zara instead.`);
+        console.log(`  Or manually save the page HTML and provide it to the scraper.\n`);
+      }
+      
+      const headers = {
+        'User-Agent': this.userAgent,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Cache-Control': 'max-age=0',
+        'DNT': '1',
+        'Referer': baseUrl,
+      };
+
+      // Generate curl command for debugging
+      const curlHeaders = Object.entries(headers)
+        .map(([key, value]) => `-H "${key}: ${value}"`)
+        .join(' \\\n  ');
+      const curlCommand = `curl -X GET "${url}" \\\n  ${curlHeaders} \\\n  --compressed \\\n  --max-time 60 \\\n  -L`;
+      
+      console.log('\n========== CURL COMMAND (Copy to Postman/Terminal) ==========');
+      console.log(curlCommand);
+      console.log('='.repeat(60) + '\n');
+      
       const response = await axios.get(url, {
         timeout: this.timeout,
-        headers: {
-          'User-Agent': this.userAgent,
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.5',
-        },
+        httpsAgent: this.httpsAgent,
+        headers,
+        maxRedirects: 10,
+        validateStatus: (status) => status < 500,
+        decompress: true,
       });
+      
+      console.log(`  ✓ Page fetched successfully (${response.data.length} bytes)`);
 
       const html = response.data;
       return this.parseProductPage(url, html);
@@ -190,10 +243,11 @@ export class WebScraperService {
   ): Promise<{ localImagePaths: string[]; imageMetadata: ImageMetadata[] }> {
     const localImagePaths: string[] = [];
     const imageMetadata: ImageMetadata[] = [];
-    const maxImages = 30; // Increased for better selection
+    const maxImages = 10; // Reduced to prevent hanging on many images
     
     console.log(`\n========== DOWNLOADING IMAGES ==========`);
-    console.log(`URLs to process: ${Math.min(imageUrls.length, maxImages)}`);
+    console.log(`Total URLs found: ${imageUrls.length}`);
+    console.log(`Will process: ${Math.min(imageUrls.length, maxImages)} images`);
 
     for (let i = 0; i < Math.min(imageUrls.length, maxImages); i++) {
       try {
@@ -205,16 +259,22 @@ export class WebScraperService {
           imageUrl = new URL(imageUrl, base.origin).toString();
         }
 
-        console.log(`\n  [${i + 1}/${Math.min(imageUrls.length, maxImages)}] Downloading:`);
-        console.log(`      URL: ${imageUrl}`);
+        console.log(`\n  [${i + 1}/${Math.min(imageUrls.length, maxImages)}] Starting download...`);
+        console.log(`      URL: ${imageUrl.substring(0, 100)}...`);
         
         const response = await axios.get(imageUrl, {
           responseType: 'arraybuffer',
-          timeout: 15000,
+          timeout: 10000, // Reduced from 15s to 10s
+          httpsAgent: this.httpsAgent,
           headers: {
             'User-Agent': this.userAgent,
+            'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+            'Referer': baseUrl,
           },
+          maxRedirects: 5,
         });
+        
+        console.log(`      ✓ Downloaded ${response.data.length} bytes`);
 
         // Determine file extension from content type or URL
         const contentType = response.headers['content-type'] || '';
@@ -252,13 +312,19 @@ export class WebScraperService {
         console.log(`        Size: ${metadata.width}x${metadata.height}, ${Math.round(metadata.fileSize/1024)}KB`);
         console.log(`        Quality: ${metadata.qualityScore.toFixed(0)}, View: ${metadata.viewType}`);
       } catch (error) {
-        console.warn(`      ✗ Failed: ${(error as Error).message}`);
-        // Continue with other images
+        const errorMsg = (error as Error).message;
+        console.warn(`      ✗ Failed image ${i + 1}: ${errorMsg.substring(0, 100)}`);
+        // Continue with other images - don't let one failure stop everything
       }
     }
     
     console.log(`\n========== DOWNLOAD COMPLETE ==========`);
     console.log(`Successfully downloaded: ${imageMetadata.length}/${Math.min(imageUrls.length, maxImages)} images`);
+    
+    // If we got no images at all, throw an error
+    if (imageMetadata.length === 0) {
+      throw new Error('Failed to download any product images. The website may be blocking downloads or images may not be accessible.');
+    }
 
     return { localImagePaths, imageMetadata };
   }
@@ -552,15 +618,34 @@ export class WebScraperService {
    * Extracts product name from common selectors
    */
   private extractProductName($: cheerio.CheerioAPI): string {
+    // List of invalid text patterns that should be rejected
+    const invalidPatterns = [
+      /you may also like/i,
+      /customers who bought/i,
+      /frequently bought/i,
+      /related products/i,
+      /similar items/i,
+      /recommended for you/i,
+      /sponsored products/i,
+      /buy it with/i,
+      /^\s*$/,  // Empty or whitespace only
+    ];
+
     const selectors = [
-      // Amazon specific selectors - multiple formats
+      // Shopee specific selectors
+      '[data-testid="pdp-product-title"]',
+      '.product-name',
+      'div[class*="product-title"]',
+      'h1[class*="_2rQP"]', // Shopee uses obfuscated class names
+      'span[class*="WKSQV"]',
+      // Amazon specific selectors - multiple formats (high priority)
       '#productTitle',
+      'span#productTitle',
+      '#title_feature_div #title',
       '#title',
       '#btAsinTitle',
-      'span#productTitle',
       'span.product-title-word-break',
       '[data-automation-id="productTitle"]',
-      '#title_feature_div #title',
       '.product-title-word-break',
       // Amazon Fashion/Bond specific
       '[data-testid="product-title"]',
@@ -575,6 +660,9 @@ export class WebScraperService {
       // Try h1 with specific classes
       'h1.a-size-large',
       'h1.a-size-medium',
+      // Meta tags (reliable source)
+      'meta[property="og:title"]',
+      'meta[name="title"]',
       // Common e-commerce selectors
       '[data-testid="product-name"]',
       '.product-name',
@@ -586,8 +674,6 @@ export class WebScraperService {
       '.product-single__title',
       // Generic fallbacks
       'h1',
-      'meta[property="og:title"]',
-      'meta[name="title"]',
     ];
 
     // Debug: Log if we're on Amazon
@@ -597,6 +683,21 @@ export class WebScraperService {
       console.log('  [DEBUG] Detected Amazon page, trying Amazon-specific selectors...');
     }
 
+    // Helper function to validate product name
+    const isValidProductName = (text: string): boolean => {
+      if (!text || text.length < 3 || text.length > 500) {
+        return false;
+      }
+      // Check against invalid patterns
+      for (const pattern of invalidPatterns) {
+        if (pattern.test(text)) {
+          console.log(`  [DEBUG] Rejected text matching pattern "${pattern}": ${text.substring(0, 50)}...`);
+          return false;
+        }
+      }
+      return true;
+    };
+
     for (const selector of selectors) {
       const element = $(selector).first();
       if (element.length) {
@@ -604,21 +705,22 @@ export class WebScraperService {
           const content = element.attr('content');
           if (content) {
             // Clean up the title (remove site names like "Amazon.com:")
-            const cleanTitle = content.replace(/\s*[-|:]\s*(Amazon|Amazon\.com).*$/i, '').trim();
-            if (cleanTitle) {
+            const cleanTitle = content
+              .replace(/\s*[-|:]\s*(Amazon|Amazon\.com).*$/i, '')
+              .replace(/^\s*(Amazon\.com\s*[-|:]\s*)/i, '')
+              .trim();
+            if (isValidProductName(cleanTitle)) {
               console.log(`  [DEBUG] Found product name via "${selector}": ${cleanTitle.substring(0, 50)}...`);
               return cleanTitle;
             }
           }
         } else {
           const text = element.text().trim();
-          if (text && text.length > 3 && text.length < 500) {  // Reasonable title length
-            // Clean up excessive whitespace
-            const cleanText = text.replace(/\s+/g, ' ').trim();
-            if (cleanText) {
-              console.log(`  [DEBUG] Found product name via "${selector}": ${cleanText.substring(0, 50)}...`);
-              return cleanText;
-            }
+          // Clean up excessive whitespace
+          const cleanText = text.replace(/\s+/g, ' ').trim();
+          if (isValidProductName(cleanText)) {
+            console.log(`  [DEBUG] Found product name via "${selector}": ${cleanText.substring(0, 50)}...`);
+            return cleanText;
           }
         }
       }
@@ -632,7 +734,7 @@ export class WebScraperService {
         .replace(/\s*[-|:]\s*(Amazon|Amazon\.com|Buy.*on Amazon).*$/i, '')
         .replace(/^\s*(Amazon\.com\s*[-|:]\s*)/i, '')
         .trim();
-      if (cleanedTitle && cleanedTitle.length > 3) {
+      if (isValidProductName(cleanedTitle)) {
         console.log(`  [DEBUG] Extracted product name from page title: ${cleanedTitle.substring(0, 50)}...`);
         return cleanedTitle;
       }
@@ -1011,6 +1113,65 @@ export class WebScraperService {
     }
 
     return images;
+  }
+
+  /**
+   * Scrapes a page using Puppeteer (fallback for blocked sites)
+   */
+  private async scrapeWithPuppeteer(url: string): Promise<ProductData> {
+    console.log('  🌐 Launching headless browser...');
+    
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gpu',
+        '--window-size=1920x1080',
+        '--user-agent=' + this.userAgent,
+      ],
+    });
+
+    try {
+      const page = await browser.newPage();
+      
+      // Set realistic viewport and user agent
+      await page.setViewport({ width: 1920, height: 1080 });
+      await page.setUserAgent(this.userAgent);
+      
+      // Set extra headers
+      await page.setExtraHTTPHeaders({
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+      });
+
+      console.log(`  📄 Navigating to ${url}...`);
+      
+      // Navigate with longer timeout for Puppeteer
+      await page.goto(url, {
+        waitUntil: 'networkidle2',
+        timeout: 30000,
+      });
+
+      console.log('  ✓ Page loaded successfully');
+      
+      // Wait a bit for dynamic content
+      await this.sleep(2000);
+
+      // Get the HTML content
+      const html = await page.content();
+      
+      await browser.close();
+      console.log('  ✓ Browser closed');
+
+      // Parse the HTML using existing parser
+      return this.parseProductPage(url, html);
+    } catch (error) {
+      await browser.close();
+      throw error;
+    }
   }
 
   /**
