@@ -129,10 +129,10 @@ export class ImageGenerationService {
       // Check if it's an SVG (placeholder) and convert to PNG
       const isSvg = buffer.toString('utf8', 0, 100).includes('<svg');
       if (isSvg) {
-        // Convert SVG to PNG using sharp
+        // Convert SVG to PNG using sharp with high quality
         await sharp(buffer)
-          .resize(1024, 1024)
-          .png()
+          .resize(2048, 2048)
+          .png({ quality: 100, compressionLevel: 6 })
           .toFile(filePath);
       } else {
         // Write regular image data
@@ -153,6 +153,48 @@ export class ImageGenerationService {
   }
 
   /**
+   * Extracts color and style information from product data
+   * This helps create explicit color descriptions in the prompt
+   */
+  private extractProductColorInfo(productData: ProductData): string {
+    const name = productData.name || '';
+    const description = productData.description || '';
+    const category = productData.category || 'product';
+    
+    // Try to extract color from name or description
+    const combinedText = `${name} ${description}`.toLowerCase();
+    
+    // Common color keywords to look for
+    const colorKeywords = [
+      'olive', 'green', 'khaki', 'military green', 'sage',
+      'navy', 'blue', 'dark blue', 'midnight',
+      'black', 'charcoal', 'grey', 'gray',
+      'white', 'cream', 'beige', 'tan',
+      'brown', 'camel', 'cognac',
+      'red', 'burgundy', 'maroon',
+      'yellow', 'mustard', 'gold'
+    ];
+    
+    const foundColors: string[] = [];
+    for (const color of colorKeywords) {
+      if (combinedText.includes(color)) {
+        foundColors.push(color);
+      }
+    }
+    
+    // Build descriptive string
+    let description_text = productData.name;
+    if (foundColors.length > 0) {
+      // Use detected colors
+      const colorPart = foundColors.join(' and ');
+      description_text = `${colorPart} ${category}`;
+    }
+    
+    // Clean up and return
+    return description_text || 'product shown in reference image';
+  }
+
+  /**
    * Constructs an optimized prompt for editorial image generation with person using product
    */
   private constructImagePrompt(brief: DesignBrief, productData: ProductData): string {
@@ -160,14 +202,72 @@ export class ImageGenerationService {
     if (brief.editorialBrief) {
       console.log('✅ Using FULL EDITORIAL BRIEF JSON for image generation');
       
+      // Extract color/style info from product data
+      const productInfo = this.extractProductColorInfo(productData);
+      console.log(`📦 Product Info: ${productInfo}`);
+      
+      // CRITICAL: Product preservation instructions MUST come first with EXPLICIT color description
+      const productPreservationHeader = `🔴🔴🔴 ABSOLUTE REQUIREMENT - PRODUCT IDENTITY 🔴🔴🔴
+
+THE REFERENCE IMAGE SHOWS: ${productInfo}
+
+YOU MUST GENERATE: ${productInfo} (EXACT SAME)
+
+CRITICAL RULES:
+1. EXACT COLOR MATCH REQUIRED
+   - Look at the reference image carefully
+   - Match the EXACT colors you see: ${productInfo}
+   - Do NOT change hues, shades, or tones
+   - Do NOT make it darker, lighter, or different
+   - EXAMPLE: If reference = olive green → output = olive green (NOT navy, NOT black, NOT dark green)
+
+2. EXACT DESIGN MATCH REQUIRED  
+   - Same style, cut, features from reference
+   - Same logos, patches, zippers visible in reference
+   - Do NOT simplify or modify design
+
+3. YOUR ONLY CREATIVE FREEDOM
+   - Scene background and environment
+   - Lighting and atmosphere (but colors stay same)
+   - Person/model pose and expression
+   - Camera angle
+
+⚠️ VALIDATION CHECKPOINT: Does my output product match "${productInfo}" exactly? YES/NO
+⚠️ If NO → Go back and match the reference image colors exactly
+
+---
+3. DESIGN LOCK: Product design elements are NON-NEGOTIABLE
+   - Keep exact same style, cut, features
+   - Preserve all logos, patches, zippers, pockets
+   - Do NOT add or remove design elements
+
+4. YOUR CREATIVE FREEDOM applies ONLY to:
+   - Scene composition and environment
+   - Lighting and atmosphere
+   - Person/model (but NOT the product they're wearing)
+   - Camera angle and framing
+
+5. VALIDATION: Before generating, confirm:
+   ✓ Am I using the EXACT product from reference?
+   ✓ Are the colors EXACTLY matching?
+   ✓ Have I kept ALL design details intact?
+
+⚠️  FAILURE TO FOLLOW THESE RULES = REJECTION
+
+---
+
+Now, create the editorial image following the brief below:`;
+      
       // Main prompt from image-prompt.json
       const mainPrompt = "You are an expert editorial art director, fashion brand strategist, and visual storyteller. Help me create editorial image following json structure below";
       
       // Convert the editorial brief to a clean JSON string
       const jsonString = JSON.stringify(brief.editorialBrief, null, 2);
       
-      // Combine: main_prompt + newline + raw JSON
-      const fullPrompt = `${mainPrompt}
+      // Combine: product rules + main_prompt + JSON
+      const fullPrompt = `${productPreservationHeader}
+
+${mainPrompt}
 
 ${jsonString}`;
 
@@ -193,8 +293,9 @@ Product: ${productData.name}
 ${productData.brand ? `Brand: ${productData.brand}` : ''}
 
 Technical Requirements:
-- High resolution, 1024x1024 minimum
-- Commercial advertising quality
+- Ultra high resolution, 2048x2048 for maximum editorial quality
+- Professional commercial advertising quality
+- Sharp details, no compression artifacts
 - Editorial magazine photography style
 - Person as the subject with product in use
 - Lifestyle scenario with authentic human interaction
@@ -286,7 +387,9 @@ CRITICAL: The image MUST show a person using or interacting with this product in
         contents: contents,
         generationConfig: {
           responseModalities: ['IMAGE', 'TEXT'],
-          temperature: 1.0,
+          temperature: 0.6,  // Lower temperature for more precise, consistent generation
+          topP: 0.95,
+          topK: 40,
         },
       };
       console.log("============Prompt============");
@@ -359,8 +462,8 @@ CRITICAL: The image MUST show a person using or interacting with this product in
     try {
       const image = sharp(imagePath);
       const metadata = await image.metadata();
-      const width = metadata.width || 1024;
-      const height = metadata.height || 1024;
+      const width = metadata.width || 2048;
+      const height = metadata.height || 2048;
 
       // Create SVG text overlay
       const productName = this.escapeXml(brief.productName);
@@ -421,8 +524,8 @@ CRITICAL: The image MUST show a person using or interacting with this product in
    * Returns a placeholder image for development
    */
   private getPlaceholderImage(): string {
-    const width = 1024;
-    const height = 1024;
+    const width = 2048;
+    const height = 2048;
 
     // Create SVG placeholder
     const svg = `
