@@ -151,7 +151,7 @@ CRITICAL: FOCUS ON MAIN PRODUCT. Return a complete JSON object with ALL fields f
       },
       "creative_concept": {
         "core_mood": "e.g., raw, tense, poetic, defiant",
-        "narrative_theme": "One-sentence story behind the image",
+        "narrative_theme": "One-sentence story about product focus and user experience behind the image",
         "editorial_statement": "Clear, opinionated message this image communicates"
       },
       "visual_hierarchy": {
@@ -160,7 +160,8 @@ CRITICAL: FOCUS ON MAIN PRODUCT. Return a complete JSON object with ALL fields f
         "frame_dominance": {
           "primary_subject_percentage": "30-50%",
           "secondary_subject_percentage": "10-30%"
-        }
+        },
+        "frame_priority_rule": "If conflict occurs, prioritize product visibility over human expression."
       },
       "product_focus": {
         "key_items": [
@@ -175,6 +176,7 @@ CRITICAL: FOCUS ON MAIN PRODUCT. Return a complete JSON object with ALL fields f
       },
       "camera_and_composition": {
         "camera_angle": "Low | Eye-level | High | Off-axis",
+        "camera_focus": "Product-centric | Human-centric | Environment-centric",
         "lens_feel": "Wide, cinematic, compressed, slightly distorted",
         "composition_style": "Asymmetrical | Center-weighted | Cropped | Dynamic",
         "depth_of_field": "Shallow | Medium | Deep"
