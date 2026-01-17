@@ -102,7 +102,7 @@ export class StorageService {
       id: uuidv4(),
       jobId,
       type,
-      url: `/generated/${filename}`,
+      url: `/generated/${jobId}/${filename}`,
       filePath,
       title,
       description,
