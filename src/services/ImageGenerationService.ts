@@ -197,17 +197,15 @@ export class ImageGenerationService {
         fs.writeFileSync(filePath, buffer);
       }
       
-      // Add text overlay using sharp
-      const finalPath = await this.addTextOverlay(filePath, brief, jobId);
-      
+      // Return raw image without overlay or modifications
       // Force cleanup to release file handles
       if (global.gc) {
         global.gc();
       }
       
       return {
-        filePath: finalPath,
-        url: `/generated/${jobId}/${path.basename(finalPath)}`,
+        filePath: filePath,
+        url: `/generated/${jobId}/${path.basename(filePath)}`,
         inputImagePath,
       };
     } catch (error) {
