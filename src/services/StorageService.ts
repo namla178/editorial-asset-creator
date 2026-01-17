@@ -129,9 +129,10 @@ export class StorageService {
 
   /**
    * Retrieves a file from storage
+   * First checks the in-memory job store, then falls back to disk search
    */
   getFile(assetId: string): { buffer: Buffer; filename: string; mimeType: string } | null {
-    // Find the asset across all jobs
+    // First, try to find the asset in the job store
     for (const job of Array.from(jobStore.values())) {
       const asset = job.assets.find((a: GeneratedAsset) => a.id === assetId);
       if (asset && fs.existsSync(asset.filePath)) {
@@ -141,6 +142,40 @@ export class StorageService {
         
         return { buffer, filename, mimeType };
       }
+    }
+
+    // Fallback: Search for the file on disk by asset ID in filename
+    // This handles cases where server restarted and job store was cleared
+    try {
+      const jobFolders = fs.readdirSync(this.generatedDir);
+      
+      for (const folder of jobFolders) {
+        const folderPath = path.join(this.generatedDir, folder);
+        const stats = fs.statSync(folderPath);
+        
+        if (stats.isDirectory()) {
+          const files = fs.readdirSync(folderPath);
+          
+          for (const file of files) {
+            // Check if the filename contains the asset ID
+            if (file.includes(assetId) || file.startsWith(assetId)) {
+              const filePath = path.join(folderPath, file);
+              const buffer = fs.readFileSync(filePath);
+              const ext = path.extname(file).toLowerCase();
+              
+              let mimeType = 'application/octet-stream';
+              if (ext === '.png') mimeType = 'image/png';
+              else if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
+              else if (ext === '.webp') mimeType = 'image/webp';
+              else if (ext === '.mp4') mimeType = 'video/mp4';
+              
+              return { buffer, filename: file, mimeType };
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error searching for file on disk:', error);
     }
 
     return null;
