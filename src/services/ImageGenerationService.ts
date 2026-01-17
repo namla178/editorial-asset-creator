@@ -187,14 +187,22 @@ export class ImageGenerationService {
       // Check if it's an SVG (placeholder) and convert to PNG
       const isSvg = buffer.toString('utf8', 0, 100).includes('<svg');
       if (isSvg) {
-        // Convert SVG to PNG using sharp with high quality
+        // Convert SVG to PNG using sharp with high quality at 3072x3072
         await sharp(buffer)
-          .resize(2048, 2048)
+          .resize(3072, 3072)
           .png({ quality: 100, compressionLevel: 6 })
           .toFile(filePath);
       } else {
-        // Write regular image data
-        fs.writeFileSync(filePath, buffer);
+        // Upscale generated image to 3072x3072 for high resolution output
+        // Gemini typically generates 1024x1024, we upscale to editorial quality
+        await sharp(buffer)
+          .resize(3072, 3072, {
+            kernel: sharp.kernel.lanczos3,  // High-quality upscaling algorithm
+            fit: 'cover',
+            position: 'center'
+          })
+          .png({ quality: 100, compressionLevel: 6 })
+          .toFile(filePath);
       }
       
       // Add text overlay using sharp
@@ -357,7 +365,7 @@ Product: ${productData.name}
 ${productData.brand ? `Brand: ${productData.brand}` : ''}
 
 Technical Requirements:
-- Ultra high resolution, 2048x2048 for maximum editorial quality
+- Ultra high resolution, 3072 x 3072 for maximum editorial quality
 - Professional commercial advertising quality
 - Sharp details, no compression artifacts
 - Editorial magazine photography style
@@ -602,8 +610,8 @@ CRITICAL: The image MUST show a person using or interacting with this product in
    * Returns a placeholder image for development
    */
   private getPlaceholderImage(): string {
-    const width = 2048;
-    const height = 2048;
+    const width = 3072;
+    const height = 3072;
 
     // Create SVG placeholder
     const svg = `

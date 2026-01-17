@@ -97,6 +97,28 @@ export class StorageService {
   ): GeneratedAsset {
     const filename = path.basename(filePath);
     const stats = fs.existsSync(filePath) ? fs.statSync(filePath) : null;
+    
+    // Read actual image dimensions for images
+    let width = 3072;  // Default for new high-res images
+    let height = 3072;
+    
+    if (type === 'image' && fs.existsSync(filePath)) {
+      try {
+        const sharp = require('sharp');
+        const metadata = sharp(filePath).metadata();
+        metadata.then((info: any) => {
+          width = info.width || 3072;
+          height = info.height || 3072;
+        }).catch(() => {
+          // Keep defaults if metadata read fails
+        });
+      } catch {
+        // Keep defaults if sharp fails
+      }
+    } else if (type === 'video') {
+      width = 1024;
+      height = 1024;
+    }
 
     const asset: GeneratedAsset = {
       id: uuidv4(),
@@ -109,8 +131,8 @@ export class StorageService {
       metadata: {
         format: type === 'image' ? 'png' : 'mp4',
         size: stats?.size || 0,
-        width: 1024,
-        height: 1024,
+        width,
+        height,
       },
       createdAt: new Date(),
     };
