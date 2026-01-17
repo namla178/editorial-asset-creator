@@ -453,11 +453,12 @@ Technical specifications:
     count: number = 1
   ): Promise<Array<{ filePath: string; url: string; thumbnail?: string }>> {
     const results: Array<{ filePath: string; url: string; thumbnail?: string }> = [];
+    const jobId = uuidv4();
     
     for (let i = 0; i < count; i++) {
       try {
         console.log(`Generating video ${i + 1} of ${count}...`);
-        const result = await this.generateVideo(brief, productData);
+        const result = await this.generateVideo(brief, productData, jobId);
         results.push(result);
       } catch (error) {
         console.error(`Failed to generate video ${i + 1}:`, error);
