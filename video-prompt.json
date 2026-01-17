@@ -1,0 +1,232 @@
+{
+  "main_prompt": "You are an expert commercial video director, motion designer, and brand storyteller. Create a cinematic editorial video following the structure below",
+  "CRITICAL_PRODUCT_RULES": {
+    "rule_1_product_identity": "🔴 ABSOLUTE REQUIREMENT - The product in the video MUST be the EXACT product shown in the reference image. Do NOT substitute, replace, or use similar products",
+    "rule_2_color_lock": "🔴 COLOR IS ABSOLUTE - Product colors must match reference exactly throughout all frames. Navy stays navy, olive stays olive. No color shifts or grading that changes product color",
+    "rule_3_design_lock": "🔴 DESIGN IS FROZEN - Every detail (zipper, logo, texture, pattern) must remain consistent with reference throughout the video",
+    "rule_4_continuous_visibility": "🔴 PRODUCT MUST BE VISIBLE - Product should be clearly visible in at least 70% of video frames. Do not hide or obscure the product",
+    "rule_5_reference_is_law": "🔴 REFERENCE IMAGE = SOURCE OF TRUTH - Creative freedom applies to camera movement, environment, and model actions - NOT to product appearance"
+  },
+  "editorial_video_brief_v1_0": {
+    "video_specifications": {
+      "duration": {
+        "default": "6 seconds",
+        "short": "4 seconds - for simple product showcase",
+        "standard": "6 seconds - for lifestyle demonstration",
+        "extended": "8 seconds - for storytelling narrative"
+      },
+      "aspect_ratio": {
+        "default": "16:9",
+        "options": ["16:9", "9:16", "1:1", "4:5"]
+      },
+      "quality": {
+        "resolution": "1080p minimum, 4K preferred",
+        "frame_rate": "24fps cinematic or 30fps smooth",
+        "codec": "H.264/H.265 for compatibility"
+      }
+    },
+    "category_specific_video_rules": {
+      "footwear": {
+        "camera_movement": "Low angle tracking shot following feet in motion, or orbital pan around stationary feet",
+        "product_focus": "Shoes must occupy 40-60% of frame throughout video",
+        "motion_type": "Walking, running, stepping, or dynamic foot movement",
+        "key_shots": [
+          "Opening: Close-up of shoes from low angle",
+          "Middle: Person walking/running with shoes prominent",
+          "Closing: Hero shot of shoes with subtle movement"
+        ],
+        "duration_recommendation": "6 seconds",
+        "camera_speed": "Medium pace to show shoe details while in motion"
+      },
+      "bags": {
+        "camera_movement": "Smooth dolly following bag movement, or orbital showcase",
+        "product_focus": "Bag must occupy 35-50% of frame, showing full silhouette",
+        "motion_type": "Shoulder carry walk, hand carry swing, or opening/reaching into bag",
+        "key_shots": [
+          "Opening: Bag being picked up or worn",
+          "Middle: Walking with bag visible, showing strap/handles",
+          "Closing: Bag details with subtle hand interaction"
+        ],
+        "duration_recommendation": "6 seconds",
+        "camera_speed": "Slow to medium, elegant movement"
+      },
+      "jewelry": {
+        "camera_movement": "MACRO slow orbit or gentle pan across jewelry piece",
+        "product_focus": "Jewelry must occupy 50-70% of frame - this is CLOSE-UP video",
+        "motion_type": "Subtle hand movement, light catching sparkle, gentle rotation",
+        "key_shots": [
+          "Opening: Light hitting jewelry, creating sparkle",
+          "Middle: Slow pan showing craftsmanship details",
+          "Closing: Pull back to show jewelry on person"
+        ],
+        "duration_recommendation": "4-6 seconds",
+        "camera_speed": "Very slow, luxurious pace"
+      },
+      "eyewear": {
+        "camera_movement": "Face-level tracking or gentle orbital around head",
+        "product_focus": "Glasses must be clearly visible 30-45% of frame",
+        "motion_type": "Putting on glasses, turning head, walking with glasses",
+        "key_shots": [
+          "Opening: Hand holding or putting on glasses",
+          "Middle: Face turn showing frame profile",
+          "Closing: Confident pose with glasses prominent"
+        ],
+        "duration_recommendation": "6 seconds",
+        "camera_speed": "Medium pace, fashion editorial feel"
+      },
+      "headwear": {
+        "camera_movement": "Head-level tracking or upward tilt to feature hat",
+        "product_focus": "Hat/cap must occupy 35-50% of frame",
+        "motion_type": "Adjusting hat, head movement, walking with hat",
+        "key_shots": [
+          "Opening: Putting on or adjusting hat",
+          "Middle: Walking or movement with hat visible",
+          "Closing: Stylish pose featuring headwear"
+        ],
+        "duration_recommendation": "6 seconds",
+        "camera_speed": "Medium, street style energy"
+      },
+      "beauty": {
+        "camera_movement": "CLOSE-UP gentle pan or static with subject movement",
+        "product_focus": "Product and application area must occupy 50-70% of frame",
+        "motion_type": "Product application, texture reveal, before/after subtle",
+        "key_shots": [
+          "Opening: Product package or application beginning",
+          "Middle: Application process or product on skin",
+          "Closing: Result reveal with subtle movement"
+        ],
+        "duration_recommendation": "6-8 seconds",
+        "camera_speed": "Slow, sensual, luxurious"
+      },
+      "sports": {
+        "camera_movement": "Dynamic tracking, low angles for power, wide for action",
+        "product_focus": "Equipment must be visible 40-60% of frames during action",
+        "motion_type": "Active use - running, lifting, playing, training",
+        "key_shots": [
+          "Opening: Athlete preparing with equipment",
+          "Middle: Full action sequence with equipment in use",
+          "Closing: Power pose or action freeze moment"
+        ],
+        "duration_recommendation": "6-8 seconds",
+        "camera_speed": "Fast for action, slow-mo for impact moments"
+      },
+      "home": {
+        "camera_movement": "Smooth dolly through space or gentle orbital around furniture",
+        "product_focus": "Furniture/item must occupy 50-70% of frame",
+        "motion_type": "Person using furniture, arranging items, living naturally",
+        "key_shots": [
+          "Opening: Wide shot establishing product in space",
+          "Middle: Person interacting with product naturally",
+          "Closing: Beauty shot of product in styled environment"
+        ],
+        "duration_recommendation": "6-8 seconds",
+        "camera_speed": "Slow, lifestyle aspirational"
+      },
+      "food": {
+        "camera_movement": "Overhead track, 45-degree dolly, or pour/pour shot",
+        "product_focus": "Food/beverage must occupy 50-70% of frame",
+        "motion_type": "Pouring, plating, tasting, steam rising",
+        "key_shots": [
+          "Opening: Product reveal or pour action",
+          "Middle: Texture close-up or serving action",
+          "Closing: Person enjoying or product beauty shot"
+        ],
+        "duration_recommendation": "4-6 seconds",
+        "camera_speed": "Slow for luxury, medium for casual"
+      },
+      "tech": {
+        "camera_movement": "Smooth orbital around device or tracking hand interaction",
+        "product_focus": "Device must occupy 50-70% of frame",
+        "motion_type": "Unboxing feel, screen interaction, feature demonstration",
+        "key_shots": [
+          "Opening: Device reveal or pick up",
+          "Middle: Active use showing screen/features",
+          "Closing: Hero product shot with subtle reflection"
+        ],
+        "duration_recommendation": "6 seconds",
+        "camera_speed": "Medium, modern tech aesthetic"
+      },
+      "apparel": {
+        "camera_movement": "Full body tracking or upper body follow for tops",
+        "product_focus": "Garment must occupy 50-70% of frame",
+        "motion_type": "Walking, turning, fabric movement, lifestyle action",
+        "key_shots": [
+          "Opening: Garment reveal or putting on",
+          "Middle: Movement showing fabric drape and fit",
+          "Closing: Styled pose or walking away shot"
+        ],
+        "duration_recommendation": "6-8 seconds",
+        "camera_speed": "Medium, fashion editorial rhythm"
+      }
+    },
+    "camera_movement_library": {
+      "orbital": "Camera circles around subject - great for product showcase",
+      "dolly_in": "Camera moves toward subject - creates intimacy",
+      "dolly_out": "Camera moves away from subject - reveals context",
+      "tracking": "Camera follows subject movement - lifestyle feel",
+      "pan": "Camera rotates horizontally - reveals environment",
+      "tilt": "Camera rotates vertically - reveals height/scale",
+      "crane_up": "Camera rises upward - dramatic reveal",
+      "crane_down": "Camera descends - intimate approach",
+      "static_with_subject_motion": "Fixed camera, subject moves - editorial feel",
+      "slow_push": "Very slow dolly in - builds tension/focus"
+    },
+    "lighting_styles": {
+      "golden_hour": "Warm, soft, directional - romantic/aspirational",
+      "overcast_soft": "Even, diffused - clean commercial look",
+      "harsh_daylight": "High contrast, dramatic shadows - edgy editorial",
+      "studio_key": "Controlled, professional - product-focused",
+      "night_mood": "Low key, atmospheric - luxury/dramatic",
+      "backlit_rim": "Subject silhouette with rim light - dramatic reveal"
+    },
+    "motion_pacing": {
+      "slow_luxurious": "0.5x-0.75x speed feel - luxury, beauty, jewelry",
+      "medium_natural": "1x natural pace - lifestyle, everyday products",
+      "fast_energetic": "1.25x-1.5x energy - sports, action, youth brands",
+      "mixed_dynamic": "Varies within video - storytelling with impact moments"
+    },
+    "storytelling_structure": {
+      "hook": "First 1-2 seconds: Grab attention with product or action",
+      "demonstrate": "Middle 2-4 seconds: Show product in use, key features",
+      "resolve": "Final 1-2 seconds: Hero shot, emotional payoff, brand moment"
+    },
+    "audio_sync_notes": {
+      "beat_sync": "Camera movements or cuts sync to music beats",
+      "action_sync": "Product interactions sync to sound design",
+      "ambient": "Natural sound design for authenticity"
+    },
+    "lifestyle_semantic_controls": {
+      "positive_signals": [
+        "authentic movement",
+        "natural product interaction",
+        "confident body language",
+        "aspirational setting",
+        "smooth camera flow",
+        "product as hero element"
+      ],
+      "negative_signals": [
+        "forced or awkward poses",
+        "product hidden or obscured",
+        "shaky or amateur camera",
+        "static boring composition",
+        "product color distortion",
+        "unnatural lighting"
+      ]
+    },
+    "final_validation_checklist": {
+      "must_have": [
+        "✓ Product clearly visible in 70%+ of frames",
+        "✓ Product colors match reference exactly",
+        "✓ Smooth, professional camera movement",
+        "✓ Person naturally interacting with product",
+        "✓ Appropriate duration for product category"
+      ],
+      "quality_gates": [
+        "✓ No product substitution or variation",
+        "✓ Lighting flatters both product and person",
+        "✓ Camera movement serves product visibility",
+        "✓ Storytelling has clear hook-demonstrate-resolve arc"
+      ]
+    }
+  }
+}
