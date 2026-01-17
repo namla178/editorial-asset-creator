@@ -79,6 +79,7 @@ export class ImageGenerationService {
    * Call this after all asset generation (images and videos) is complete
    */
   public cleanupCrawledImages(productData: ProductData): void {
+    //return;
     if (!productData.localImagePaths || productData.localImagePaths.length === 0) {
       return;
     }

@@ -113,14 +113,14 @@ export class WebScraperService {
       if (axiosError.response) {
         const status = axiosError.response.status;
         if (status === 404) {
-          throw new Error('Product page not found (404)');
+          throw new Error('Product page not found. Please check the URL and try again.');
         } else if (status === 403) {
-          throw new Error('Access denied to product page (403)');
+          throw new Error('This website is blocking our access. Please try a product from another store like Nike, Amazon, or Jack & Jones.');
         } else if (status >= 500) {
-          throw new Error(`Server error (${status})`);
+          throw new Error(`The website is temporarily unavailable. Please try again later.`);
         }
       } else if (axiosError.code === 'ECONNABORTED') {
-        throw new Error('Request timed out');
+        throw new Error('The request took too long. Please check your internet connection and try again.');
       }
       
       throw error;
@@ -148,7 +148,7 @@ export class WebScraperService {
     const brand = this.extractProductBrand($);
 
     if (!name) {
-      throw new Error('Could not extract product name from page');
+      throw new Error('Unable to find product information on this page. Please make sure you\'re using a direct product page URL (not a search results or category page).');
     }
 
     // Download product images locally with comprehensive metadata
@@ -553,12 +553,31 @@ export class WebScraperService {
    */
   private extractProductName($: cheerio.CheerioAPI): string {
     const selectors = [
-      // Common e-commerce selectors
-      '[data-testid="product-title"]',
-      '[data-testid="product-name"]',
-      '.product-title',
-      '.product-name',
+      // Amazon specific selectors - multiple formats
       '#productTitle',
+      '#title',
+      '#btAsinTitle',
+      'span#productTitle',
+      'span.product-title-word-break',
+      '[data-automation-id="productTitle"]',
+      '#title_feature_div #title',
+      '.product-title-word-break',
+      // Amazon Fashion/Bond specific
+      '[data-testid="product-title"]',
+      '[data-testid="title"]',
+      '.product-title',
+      'h1[data-cy="product-title"]',
+      '.title-wrapper h1',
+      // Amazon mobile/alternate layouts
+      '#title span',
+      '.a-size-large.product-title-word-break',
+      '.a-size-medium.product-title-word-break',
+      // Try h1 with specific classes
+      'h1.a-size-large',
+      'h1.a-size-medium',
+      // Common e-commerce selectors
+      '[data-testid="product-name"]',
+      '.product-name',
       '#product-title',
       'h1.title',
       'h1[itemprop="name"]',
@@ -568,21 +587,58 @@ export class WebScraperService {
       // Generic fallbacks
       'h1',
       'meta[property="og:title"]',
+      'meta[name="title"]',
     ];
+
+    // Debug: Log if we're on Amazon
+    const isAmazon = $('link[rel="canonical"]').attr('href')?.includes('amazon') || 
+                     $('meta[property="og:site_name"]').attr('content')?.toLowerCase().includes('amazon');
+    if (isAmazon) {
+      console.log('  [DEBUG] Detected Amazon page, trying Amazon-specific selectors...');
+    }
 
     for (const selector of selectors) {
       const element = $(selector).first();
       if (element.length) {
         if (selector.startsWith('meta')) {
           const content = element.attr('content');
-          if (content) return content.trim();
+          if (content) {
+            // Clean up the title (remove site names like "Amazon.com:")
+            const cleanTitle = content.replace(/\s*[-|:]\s*(Amazon|Amazon\.com).*$/i, '').trim();
+            if (cleanTitle) {
+              console.log(`  [DEBUG] Found product name via "${selector}": ${cleanTitle.substring(0, 50)}...`);
+              return cleanTitle;
+            }
+          }
         } else {
           const text = element.text().trim();
-          if (text) return text;
+          if (text && text.length > 3 && text.length < 500) {  // Reasonable title length
+            // Clean up excessive whitespace
+            const cleanText = text.replace(/\s+/g, ' ').trim();
+            if (cleanText) {
+              console.log(`  [DEBUG] Found product name via "${selector}": ${cleanText.substring(0, 50)}...`);
+              return cleanText;
+            }
+          }
         }
       }
     }
 
+    // Last resort: try to extract from page title
+    const pageTitle = $('title').text().trim();
+    if (pageTitle) {
+      // Clean Amazon-style titles: "Product Name : Amazon.com"
+      const cleanedTitle = pageTitle
+        .replace(/\s*[-|:]\s*(Amazon|Amazon\.com|Buy.*on Amazon).*$/i, '')
+        .replace(/^\s*(Amazon\.com\s*[-|:]\s*)/i, '')
+        .trim();
+      if (cleanedTitle && cleanedTitle.length > 3) {
+        console.log(`  [DEBUG] Extracted product name from page title: ${cleanedTitle.substring(0, 50)}...`);
+        return cleanedTitle;
+      }
+    }
+
+    console.log('  [DEBUG] Could not find product name with any selector');
     return '';
   }
 
@@ -632,6 +688,16 @@ export class WebScraperService {
     console.log('\n========== IMAGE EXTRACTION DEBUG ==========');
 
     const selectors = [
+      // Amazon specific selectors (high priority)
+      '#landingImage',
+      '#imgBlkFront',
+      '#main-image',
+      '#imgTagWrapperId img',
+      '.imgTagWrapper img',
+      '#altImages img',
+      '#imageBlock img',
+      '[data-old-hires]',
+      '[data-a-dynamic-image]',
       // Common e-commerce image selectors
       '[data-testid="product-image"] img',
       '.product-image img',
@@ -644,7 +710,6 @@ export class WebScraperService {
       'meta[property="og:image"]',
       // Generic product images
       '.gallery img',
-      '#imageBlock img',
       // Nike specific selectors
       '.css-1b8ovvw img', // Nike gallery
       '[class*="galleryImage"] img',
@@ -691,6 +756,29 @@ export class WebScraperService {
           const dataSrc = $(element).attr('data-src');
           const srcset = $(element).attr('srcset');
           const dataImage = $(element).attr('data-image');
+          // Amazon specific high-res attributes
+          const dataOldHires = $(element).attr('data-old-hires');
+          const dataDynamicImage = $(element).attr('data-a-dynamic-image');
+
+          // Amazon high-res images (highest priority)
+          if (dataOldHires && this.isValidImageUrl(dataOldHires)) {
+            console.log(`    [data-old-hires] Found: ${dataOldHires.substring(0, 80)}...`);
+            images.add(dataOldHires);
+          }
+          if (dataDynamicImage) {
+            try {
+              // data-a-dynamic-image contains JSON with image URLs and dimensions
+              const dynamicImages = JSON.parse(dataDynamicImage);
+              for (const [imgUrl] of Object.entries(dynamicImages)) {
+                if (this.isValidImageUrl(imgUrl)) {
+                  console.log(`    [data-a-dynamic-image] Found: ${imgUrl.substring(0, 80)}...`);
+                  images.add(imgUrl);
+                }
+              }
+            } catch {
+              // Not valid JSON, skip
+            }
+          }
 
           if (src && this.isValidImageUrl(src)) {
             const highResSrc = this.getHigherQualityUrl(src);
@@ -828,6 +916,25 @@ export class WebScraperService {
    */
   private getHigherQualityUrl(url: string): string {
     let highResUrl = url;
+    
+    // Amazon specific transformations - get highest quality images
+    if (url.includes('media-amazon.com') || url.includes('amazon.com')) {
+      // Amazon image URLs often have size codes like _AC_SR71,95_ or _SX342_
+      // Replace with larger size codes for high-res images
+      highResUrl = url
+        .replace(/_AC_SR\d+,\d+_/g, '_AC_SL1500_')   // Small to large
+        .replace(/_SX\d+_/g, '_SL1500_')             // Width constrained
+        .replace(/_SY\d+_/g, '_SL1500_')             // Height constrained
+        .replace(/_AC_SX\d+_/g, '_AC_SL1500_')       // Auto-crop width
+        .replace(/_AC_SY\d+_/g, '_AC_SL1500_')       // Auto-crop height
+        .replace(/_US\d+_/g, '_SL1500_')             // US size variant
+        .replace(/_CR\d+,\d+,\d+,\d+_/g, '')         // Remove crop
+        .replace(/_QL\d+_/g, '_QL100_')              // Max quality
+        .replace(/_FMwebp_/g, '_')                    // Remove webp conversion
+        .replace(/\._[^.]+_\./g, '._SL1500_.');      // Generic size replacement
+      
+      return highResUrl;
+    }
     
     // Nike specific transformations
     if (url.includes('nike.com')) {
