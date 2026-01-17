@@ -114,10 +114,14 @@ export class WebScraperService {
       errorMessage.includes('timeout') ||
       errorMessage.includes('took too long') ||
       errorMessage.includes('403') ||
-      errorMessage.includes('blocking');
+      errorMessage.includes('blocking') ||
+      errorMessage.includes('NEEDS_JS_RENDERING'); // JavaScript-heavy sites like Shopee
 
     if (isBlockingError) {
-      console.log('\n  🤖 Axios blocked - switching to Puppeteer (headless browser)...');
+      const reason = errorMessage.includes('NEEDS_JS_RENDERING') 
+        ? 'JavaScript rendering required' 
+        : 'Axios blocked';
+      console.log(`\n  🤖 ${reason} - switching to Puppeteer (headless browser)...`);
       try {
         const productData = await this.scrapeWithPuppeteer(url);
         logResponse('WebScraper', 'scrapeProductPage', {
@@ -224,7 +228,7 @@ export class WebScraperService {
   /**
    * Parses HTML to extract product data
    */
-  private async parseProductPage(url: string, html: string): Promise<ProductData> {
+  private async parseProductPage(url: string, html: string, allowEmpty = false): Promise<ProductData> {
     const $ = cheerio.load(html);
 
     const name = this.extractProductName($);
@@ -241,8 +245,9 @@ export class WebScraperService {
     console.log('='.repeat(60));
     const brand = this.extractProductBrand($);
 
-    if (!name) {
-      throw new Error('Unable to find product information on this page. Please make sure you\'re using a direct product page URL (not a search results or category page).');
+    if (!name && !allowEmpty) {
+      // Instead of throwing error, signal that we need JavaScript rendering
+      throw new Error('NEEDS_JS_RENDERING');
     }
 
     // Download product images locally with comprehensive metadata
@@ -673,6 +678,12 @@ export class WebScraperService {
     ];
 
     const selectors = [
+      // Shopee specific selectors
+      '[data-testid="pdp-product-title"]',
+      '.product-name',
+      'div[class*="product-title"]',
+      'h1[class*="_2rQP"]', // Shopee uses obfuscated class names
+      'span[class*="WKSQV"]',
       // Amazon specific selectors - multiple formats (high priority)
       '#productTitle',
       'span#productTitle',
@@ -1201,8 +1212,8 @@ export class WebScraperService {
       await browser.close();
       console.log('  ✓ Browser closed');
 
-      // Parse the HTML using existing parser
-      return this.parseProductPage(url, html);
+      // Parse the HTML using existing parser (allow empty since we tried our best)
+      return this.parseProductPage(url, html, true);
     } catch (error) {
       await browser.close();
       throw error;
