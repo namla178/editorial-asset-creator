@@ -187,14 +187,32 @@ export class ImageGenerationService {
       // Check if it's an SVG (placeholder) and convert to PNG
       const isSvg = buffer.toString('utf8', 0, 100).includes('<svg');
       if (isSvg) {
-        // Convert SVG to PNG using sharp with high quality
+        // Convert SVG to PNG using sharp with high quality at 3072x3072
         await sharp(buffer)
-          .resize(2048, 2048)
+          .resize(3072, 3072)
           .png({ quality: 100, compressionLevel: 6 })
           .toFile(filePath);
       } else {
-        // Write regular image data
-        fs.writeFileSync(filePath, buffer);
+        // Use Imagen 4 AI Upscale for high-quality 3x upscaling (1024 -> 3072)
+        // This preserves details much better than algorithmic upscaling
+        console.log('Using Imagen 4 AI Upscale for high-quality resolution enhancement...');
+        try {
+          const upscaledImageData = await this.callImagen4UpscaleAPI(imageData, 'x3');
+          const upscaledBuffer = Buffer.from(upscaledImageData, 'base64');
+          fs.writeFileSync(filePath, upscaledBuffer);
+          console.log('  ✓ AI upscaling complete: 1024x1024 → 3072x3072');
+        } catch (upscaleError) {
+          console.warn('  ⚠ AI upscaling failed, falling back to Sharp Lanczos3:', (upscaleError as Error).message);
+          // Fallback to Sharp if Imagen Upscale fails
+          await sharp(buffer)
+            .resize(3072, 3072, {
+              kernel: sharp.kernel.lanczos3,
+              fit: 'cover',
+              position: 'center'
+            })
+            .png({ quality: 100, compressionLevel: 6 })
+            .toFile(filePath);
+        }
       }
       
       // Return raw image without overlay or modifications
@@ -355,7 +373,7 @@ Product: ${productData.name}
 ${productData.brand ? `Brand: ${productData.brand}` : ''}
 
 Technical Requirements:
-- Ultra high resolution, 2048x2048 for maximum editorial quality
+- Ultra high resolution, 3072 x 3072 for maximum editorial quality
 - Professional commercial advertising quality
 - Sharp details, no compression artifacts
 - Editorial magazine photography style
@@ -531,6 +549,98 @@ CRITICAL: The image MUST show a person using or interacting with this product in
   }
 
   /**
+   * Calls the Vertex AI Imagen 4 Upscale API for AI-based image upscaling
+   * Supports x2, x3, x4 upscale factors
+   * Maximum output: 17 megapixels (e.g., 1024 * 3 = 3072, which is ~9.4MP - well within limits)
+   */
+  private async callImagen4UpscaleAPI(imageBase64: string, upscaleFactor: 'x2' | 'x3' | 'x4' = 'x3'): Promise<string> {
+    const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    
+    if (!credPath || !fs.existsSync(credPath)) {
+      throw new Error('Credentials file not found for Imagen Upscale API');
+    }
+
+    const project = process.env.GOOGLE_CLOUD_PROJECT;
+    const location = process.env.GOOGLE_CLOUD_REGION || 'us-central1';
+    const model = 'imagen-4.0-upscale-preview';
+    
+    const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${model}:predict`;
+    
+    console.log('Imagen 4 Upscale Configuration:');
+    console.log('  Model:', model);
+    console.log('  Upscale factor:', upscaleFactor);
+    
+    // Get access token from service account
+    const { GoogleAuth } = require('google-auth-library');
+    const auth = new GoogleAuth({
+      keyFilename: credPath,
+      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+    });
+    const client = await auth.getClient();
+    const accessToken = await client.getAccessToken();
+
+    const requestBody = {
+      instances: [
+        {
+          prompt: 'Upscale this image while preserving all details, colors, and textures',
+          image: {
+            bytesBase64Encoded: imageBase64,
+          },
+        }
+      ],
+      parameters: {
+        mode: 'upscale',
+        upscaleConfig: {
+          upscaleFactor: upscaleFactor,
+        },
+        outputOptions: {
+          mimeType: 'image/png',
+        },
+      },
+    };
+
+    logRequest('Imagen 4 Upscale', 'upscaleImage', {
+      endpoint,
+      model,
+      upscaleFactor,
+    });
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logError('Imagen 4 Upscale', 'upscaleImage', new Error(`${response.status} - ${errorText}`), {
+        status: response.status,
+        statusText: response.statusText,
+      });
+      throw new Error(`Imagen Upscale API error: ${response.status} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    
+    logResponse('Imagen 4 Upscale', 'upscaleImage', {
+      status: response.status,
+      hasPredictions: !!result.predictions,
+      predictionsCount: result.predictions?.length || 0,
+    });
+    
+    // Extract base64 image from response
+    if (result.predictions && result.predictions[0]?.bytesBase64Encoded) {
+      console.log('  ✓ Imagen 4 Upscale successful!');
+      return result.predictions[0].bytesBase64Encoded;
+    }
+    
+    throw new Error('No image data in Imagen Upscale response');
+  }
+
+  /**
    * Adds text overlay to the generated image using sharp
    */
   private async addTextOverlay(imagePath: string, brief: DesignBrief, jobId: string): Promise<string> {
@@ -600,8 +710,8 @@ CRITICAL: The image MUST show a person using or interacting with this product in
    * Returns a placeholder image for development
    */
   private getPlaceholderImage(): string {
-    const width = 2048;
-    const height = 2048;
+    const width = 3072;
+    const height = 3072;
 
     // Create SVG placeholder
     const svg = `
